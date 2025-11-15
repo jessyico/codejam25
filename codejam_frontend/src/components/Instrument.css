@@ -1,36 +1,22 @@
-/* src/components/Instrument/Instrument.css */
+.instrument-wrapper {
+  display: inline-block;
+  margin: 20px;
+}
 
-.instruments-container {
-    position: fixed;
-    right: 20px;           /* Distance from the right side */
-    top: 50%;              /* Vertically centered */
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 15px;             /* Space between icons */
-    pointer-events: auto;
-  }
-  
-  .instrument {
-    width: 200px;           /* Icon size */
-    height: 150px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.2s;
-    border: 3px solid pink;
-    border-radius: 10px;
-    background-color: pink;
-  }
-  
-  .instrument img {
-    max-width: 100%;
-    max-height: 100%;
-    border-radius: 10px;   /* Optional rounding */
-  }
-  
-  .instrument:hover img {
-    transform: scale(1.1); /* Subtle hover effect */
-  }
-  
+.instrument {
+  width: 200px;
+  height: 150px;
+  background: pink;
+  border: 3px solid hotpink;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.instrument img {
+  max-width: 100%;
+  max-height: 100%;
+  pointer-events: none;
+}
+
