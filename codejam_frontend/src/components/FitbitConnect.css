@@ -1,0 +1,19 @@
+/* Pink connect button */
+.connect-sensor-btn {
+  background: pink;
+  color: black;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 24px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.connect-sensor-btn:hover {
+  background: rgb(241, 139, 156);
+}
+
+.connect-sensor-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

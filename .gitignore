@@ -1,4 +1,12 @@
+<<<<<<< HEAD
 valerie/
 .valerie/
 __pycache__/
 .DS_Store
+=======
+package.json
+package-lock.json
+.venv
+venv
+node_modules
+>>>>>>> b1c7b0000c5229d06d21c957ed629b8370653cd9

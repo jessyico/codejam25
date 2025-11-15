@@ -1,0 +1,22 @@
+.instrument-wrapper {
+  display: inline-block;
+  margin: 20px;
+}
+
+.instrument {
+  width: 100px;
+  height: 100px;
+  background: pink;
+  border: 3px solid hotpink;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.instrument img {
+  max-width: 100%;
+  max-height: 100%;
+  pointer-events: none;
+}
+
