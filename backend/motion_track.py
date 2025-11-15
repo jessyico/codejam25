@@ -79,7 +79,8 @@ def get_finger_number(hand_landmarks):
     middle = states["middle"]
     ring   = states["ring"]
     pinky  = states["pinky"]
-
+    
+    
     # 1: index only
     if index and not (thumb or middle or ring or pinky):
         return 1
@@ -99,9 +100,8 @@ def get_finger_number(hand_landmarks):
     # 5: all five extended
     if index and middle and ring and pinky and thumb:
         return 5
-
-    # Anything else = not a clean number gesture
-    return 0
+    
+    return 0  # default: none or unrecognized
 
 def is_ok_sign(hand_landmarks, dist_ratio_thresh=0.3):
     """
@@ -496,16 +496,12 @@ class MotionEngine:
                     # Count fingers for this hand (for track/instrument selection)
                     count = get_finger_number(hand_landmarks)
 
-                    # RIGHT HAND → pending track (1–5, with fist treated as 1)
-                    if hand_label == "Right" and count > 1:
+                    # RIGHT HAND → pending track (1–5)
+                    if hand_label == "Right" and count > 0:
                         right_candidate_track = count
-                    if hand_label == "Right" and count == 0:
-                        right_candidate_track = 1  # fist = 1
-
-                    # LEFT HAND → pending instrument (1–5, with fist treated as 1)
-                    if hand_label == "Left" and (count > 1 or count == 0):
-                        # fist = 1, else 2–5
-                        left_candidate_instrument = (1 if count == 0 else count)
+                    # LEFT HAND → pending instrument (1–5)
+                    if hand_label == "Left" and count > 0:
+                        left_candidate_instrument = count
 
                     # POINTER: any hand with exactly 1 finger (index only)
                     if count == 1:
