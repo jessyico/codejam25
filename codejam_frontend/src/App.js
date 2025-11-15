@@ -11,6 +11,7 @@ import drumGif from "./assets/pixeldrums.png";
 import bassGif from "./assets/pixelbass.png";
 import saxoGif from "./assets/saxophone.png";
 import logo from "./assets/heartjamlogo.png";
+import FitbitConnector from "./components/FitbitConnect";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
 import React from 'react';
@@ -101,6 +102,7 @@ function App() {
     <div>
      <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
   <img src={logo} alt="HeartJam Logo" style={{ width: "500px" }} />
+  <FitbitConnector onBpmChange={setBpm} />
 </div>
 
      {/*} <h1 className="pixelify-sans">Listen to your heart</h1>*/}
@@ -112,6 +114,8 @@ function App() {
     {/* LEFT: Camera */}
     <div style={{ flex: 1 }}>
     { /*  <CameraFeed /> */}
+    <CameraFeed />
+      
     
       <p>Current BPM: {bpm}</p>
       <Heart bpm={bpm} />
@@ -134,7 +138,7 @@ function App() {
           </div>
           */}
           {/* Second column right-aligned */}
-          <div style={{ margin: "0 auto" }}>
+          <div style={{ marginLeft: "auto" }}>
             <Column id="top" Instruments={Instruments} maxSlots={5} />
           </div>
         </SortableContext>
