@@ -1,0 +1,9 @@
+.pixel-mouse {
+    width: 200px;
+    image-rendering: pixelated;
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .pixel-mouse:hover {
+    transform: translateY(-10px);
+  }

@@ -1,24 +1,47 @@
 import React, { useState } from "react";
 import "./Instrument.css";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
-export default function Instrument({ imgSrc, alt, onClick, showFire = false }) {
-  const [fireVisible, setFireVisible] = useState(false);
+export const Instrument = ({ id, title, imgSrc, alt }) => {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const [isZoomed, setIsZoomed] = useState(false);
 
-  const handleClick = () => {
-    if (showFire) {
-      setFireVisible(true);
-      setTimeout(() => setFireVisible(false), 1000);
+  const style = {
+    transition,
+    transform: CSS.Transform.toString(transform),
+  };
+
+  const imgStyle = {
+    width: "100px",
+    transform: isZoomed ? "scale(1.5)" : "scale(1)",
+    transition: "transform 0.2s ease",
+    cursor: "pointer",
+  };
+
+  const handlePointerDown = (e) => {
+    // Only toggle zoom on left click, not during drag
+    if (e.button === 0 && !e.ctrlKey && !e.shiftKey) {
+      e.preventDefault();
+      setIsZoomed(!isZoomed);
     }
-
-    if (onClick) onClick();
   };
 
   return (
-    <div className="instrument" onClick={handleClick}>
-      <img src={imgSrc} alt={alt} />
-
-      {fireVisible && <span className="emoji-fire">🔥</span>}
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={style}
+      className="instrument"
+    >
+      <img
+        src={imgSrc}
+        alt={alt}
+        style={imgStyle}
+        onPointerDown={handlePointerDown}
+      />
+      <div>{title || alt}</div>
     </div>
   );
-}
-
+};
