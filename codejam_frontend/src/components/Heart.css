@@ -1,0 +1,99 @@
+/* Heart component styles */
+
+.heart-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.heart-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+  justify-content: space-between;
+}
+
+.heart-controls button {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #e1e1e1;
+  background: pink;
+  cursor: pointer;
+  font-family: "Barriecito", system-ui;
+}
+
+.heart-controls button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.heart-status {
+  color: #686868;
+  font-size: 0.95rem;
+  min-width: 160px;
+  text-align: center;
+}
+
+.heart-bpm-display {
+  font-size: 1.05rem;
+  color: #222;
+}
+
+.ekg-wrapper {
+    position: fixed;
+    bottom: 20px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    align-items: center;
+  }
+  
+  .ekg-line {
+    width: 80%;
+    max-width: 500px;
+    stroke-dasharray: 500 500;
+    stroke-dashoffset: 500;
+    animation: heartbeat linear infinite;
+  }
+  
+  @keyframes heartbeat {
+    0% {
+      stroke-dashoffset: 500;
+    }
+    100% {
+      stroke-dashoffset: 0;
+    }
+  }
+  
+  /* Heart in the center */
+  .heart-icon {
+    position: absolute;
+    font-size: 40px;
+    color: red;
+    left: 50%; /* center horizontally */
+    transform: translateX(-50%);
+    animation: pulse infinite ease-in-out;
+  }
+  
+  /* Pulse animation scaled by BPM */
+  @keyframes pulse {
+    0% {
+      transform: translateX(-50%) scale(1);
+    }
+    50% {
+      transform: translateX(-50%) scale(1.5);
+    }
+    100% {
+      transform: translateX(-50%) scale(1);
+    }
+  }
+  
+  
