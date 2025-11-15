@@ -1,6 +1,8 @@
 import cv2, math
 import mediapipe as mp
-import numpy as np   # you already have cv2, mediapipe, math, etc.
+import numpy as np 
+from collections import deque
+
 
 def _angle_at_joint(a, b, c):
     """
@@ -28,41 +30,119 @@ def _angle_at_joint(a, b, c):
     cos_theta = max(-1.0, min(1.0, dot / (mag_ba * mag_bc)))
     return math.acos(cos_theta)
 
-def count_extended_fingers(hand_landmarks):
+def get_finger_states(hand_landmarks):
     """
-    Counts extended fingers (thumb + 4 fingers) based on joint angles.
-    More robust to rotation and motion than simple y-comparisons.
-    Returns an integer 0–5.
+    Returns which fingers are extended, using joint angles.
+    More robust than raw y comparisons.
+
+    Output:
+      {
+        "thumb":  True/False,
+        "index":  True/False,
+        "middle": True/False,
+        "ring":   True/False,
+        "pinky":  True/False,
+      }
     """
     lm = hand_landmarks.landmark
-    fingers = 0
-
-    # Angle threshold: above this -> considered "straight"
     EXTENDED_ANGLE_DEG = 160.0
     EXTENDED_ANGLE_RAD = math.radians(EXTENDED_ANGLE_DEG)
 
-    # Index: 5 (MCP), 6 (PIP), 8 (TIP) -> angle at 6
-    if _angle_at_joint(lm[5], lm[6], lm[8]) > EXTENDED_ANGLE_RAD:
-        fingers += 1
+    def is_extended(mcp_idx, pip_idx, tip_idx):
+        return _angle_at_joint(lm[mcp_idx], lm[pip_idx], lm[tip_idx]) > EXTENDED_ANGLE_RAD
 
-    # Middle: 9 (MCP), 10 (PIP), 12 (TIP)
-    if _angle_at_joint(lm[9], lm[10], lm[12]) > EXTENDED_ANGLE_RAD:
-        fingers += 1
-
-    # Ring: 13 (MCP), 14 (PIP), 16 (TIP)
-    if _angle_at_joint(lm[13], lm[14], lm[16]) > EXTENDED_ANGLE_RAD:
-        fingers += 1
-
-    # Pinky: 17 (MCP), 18 (PIP), 20 (TIP)
-    if _angle_at_joint(lm[17], lm[18], lm[20]) > EXTENDED_ANGLE_RAD:
-        fingers += 1
-
+    # Index: 5 (MCP), 6 (PIP), 8 (TIP)
+    index_ext  = is_extended(5, 6, 8)
+    # Middle: 9, 10, 12
+    middle_ext = is_extended(9, 10, 12)
+    # Ring: 13, 14, 16
+    ring_ext   = is_extended(13, 14, 16)
+    # Pinky: 17, 18, 20
+    pinky_ext  = is_extended(17, 18, 20)
     # Thumb: 2 (MCP), 3 (IP), 4 (TIP)
-    # Finger is extended if the IP joint angle is also large
-    if _angle_at_joint(lm[2], lm[3], lm[4]) > EXTENDED_ANGLE_RAD:
-        fingers += 1
+    thumb_ext  = is_extended(2, 3, 4)
 
-    return fingers
+    return {
+        "thumb":  thumb_ext,
+        "index":  index_ext,
+        "middle": middle_ext,
+        "ring":   ring_ext,
+        "pinky":  pinky_ext,
+    }
+
+def get_finger_number(hand_landmarks):
+    ''' Counts how many fingers are extended.'''
+
+    states = get_finger_states(hand_landmarks)
+    thumb  = states["thumb"]
+    index  = states["index"]
+    middle = states["middle"]
+    ring   = states["ring"]
+    pinky  = states["pinky"]
+
+    # 1: index only
+    if index and not (thumb or middle or ring or pinky):
+        return 1
+
+    # 2: index + middle only
+    if index and middle and not (thumb or ring or pinky):
+        return 2
+
+    # 3: index + middle + ring only
+    if index and middle and ring and not (thumb or pinky):
+        return 3
+
+    # 4: index + middle + ring + pinky (thumb down)
+    if index and middle and ring and pinky and not thumb:
+        return 4
+
+    # 5: all five extended
+    if index and middle and ring and pinky and thumb:
+        return 5
+
+    # Anything else = not a clean number gesture
+    return 0
+
+def is_ok_sign(hand_landmarks, dist_ratio_thresh=0.3):
+    """
+    Detect a rough 'OK' sign:
+
+    - Thumb tip and index tip are very close (forming a circle),
+      relative to the hand size.
+    - Middle finger is extended (so it's not just a fist).
+
+    This is heuristic, you can tweak thresholds later.
+    """
+    lm = hand_landmarks.landmark
+
+    thumb_tip = lm[4]
+    index_tip = lm[8]
+
+    # Use distance between index MCP and pinky MCP as a rough hand-size reference
+    index_mcp = lm[5]
+    pinky_mcp = lm[17]
+
+    dx_hand = index_mcp.x - pinky_mcp.x
+    dy_hand = index_mcp.y - pinky_mcp.y
+    hand_size = math.sqrt(dx_hand * dx_hand + dy_hand * dy_hand)
+
+    if hand_size < 1e-6:
+        return False
+
+    # Distance between thumb tip and index tip
+    dx = thumb_tip.x - index_tip.x
+    dy = thumb_tip.y - index_tip.y
+    tip_dist = math.sqrt(dx * dx + dy * dy)
+
+    # Require the two tips to be close relative to hand size
+    if tip_dist > dist_ratio_thresh * hand_size:
+        return False
+
+    # Also require middle finger extended (just to avoid any random pinch)
+    states = get_finger_states(hand_landmarks)
+    middle_ext = states["middle"]
+
+    return middle_ext
 
 def is_thumb_up(hand_landmarks):
     """
@@ -73,23 +153,22 @@ def is_thumb_up(hand_landmarks):
     """
 
     lm = hand_landmarks.landmark
+    states = get_finger_states(hand_landmarks)
 
-    # Landmarks we care about
+    # Thumb must be extended, others mostly folded
+    thumb  = states["thumb"]
+    index  = states["index"]
+    middle = states["middle"]
+    ring   = states["ring"]
+    pinky  = states["pinky"]
+
+    others_folded = not (index or middle or ring or pinky)
+
     thumb_tip  = lm[4]
-    index_mcp  = lm[5]   # base of index finger
+    index_mcp  = lm[5]
+    thumb_up_dir = thumb_tip.y < index_mcp.y
 
-    # Thumb up: tip higher (smaller y) than index MCP
-    thumb_up = thumb_tip.y < index_mcp.y
-
-    # Other 4 fingers: check they are NOT extended
-    index_up  = lm[8].y  < lm[6].y
-    middle_up = lm[12].y < lm[10].y
-    ring_up   = lm[16].y < lm[14].y
-    pinky_up  = lm[20].y < lm[18].y
-
-    others_folded = not (index_up or middle_up or ring_up or pinky_up)
-
-    return thumb_up and others_folded
+    return thumb and others_folded and thumb_up_dir
 
 def euclidean_dist(p1, p2):
     return math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2)
@@ -135,18 +214,92 @@ def classify_expression(mouth_features, smile_thresh=-0.01, frown_thresh=0.01):
         return "frown"
     else:
         return "neutral"
+
+def draw_point_history(image, point_history):
+    """
+    Draws a fading trail for the pointer (index fingertip).
+    point_history: deque of (x, y) or None.
+    """
+    for idx, point in enumerate(point_history):
+        if point is None:
+            continue
+        x, y = point
+        # Older points → smaller / lighter trail; tweak radius if you want
+        radius = 2 + idx // 2
+        cv2.circle(image, (x, y), radius, (0, 255, 255), 2)
+    return image
+
+def detect_circle_direction(point_history,
+                            min_points=20,
+                            min_radius=25,
+                            min_total_angle=2*math.pi*0.8):
+    """
+    Detect if recent pointer motion forms a roughly circular path and
+    estimate its direction:
+        - returns 'cw'  for clockwise
+        - returns 'ccw' for counterclockwise
+        - returns None  if no clear circle
+
+    Uses the pointer trajectory in pixel coords stored in point_history.
+    """
+
+    # Keep only actual points (ignore None separators)
+    pts = [p for p in point_history if p is not None]
+    if len(pts) < min_points:
+        return None
+
+    xs = np.array([p[0] for p in pts], dtype=float)
+    ys = np.array([p[1] for p in pts], dtype=float)
+
+    # Center of the path
+    cx = xs.mean()
+    cy = ys.mean()
+
+    dx = xs - cx
+    dy = ys - cy
+    radii = np.sqrt(dx * dx + dy * dy)
+    mean_r = radii.mean()
+
+    # Require the circle to be "big enough"
+    if mean_r < min_radius:
+        return None
+
+    # Radius should be reasonably consistent
+    radius_rel_std = radii.std() / (mean_r + 1e-6)
+    if radius_rel_std > 0.4:
+        return None
+
+    # Angles around the center
+    angles = np.arctan2(dy, dx)
+    # Unwrap to get smooth evolution over time
+    angles_unwrapped = np.unwrap(angles)
+
+    total_angle = angles_unwrapped[-1] - angles_unwrapped[0]
+
+    # Need to cover most of a full rotation
+    if abs(total_angle) < min_total_angle:
+        return None
+
+    # Screen coords: y increases downward, so this may feel flipped.
+    # We define:
+    #   total_angle < 0  => 'cw'
+    #   total_angle > 0  => 'ccw'
+    direction = 'cw' if total_angle < 0 else 'ccw'
+
+    # Clear history so each circle is a single "pulse"
+    point_history.clear()
+
+    return direction
+
     
 def detect_opera(mouth_features,
                  open_thresh=0.03,
-                 max_open=0.09,
                  smile_curv_limit=-0.01):
     """
     Decide if 'opera' mouth is active and how open it is.
 
     Rules:
     - Must be clearly open: mouth_height > open_thresh
-    - Must NOT be a big smile: curvature must not be strongly negative
-      (curvature < 0 = smile; more negative = bigger smile)
     - Shape doesn't need to be perfectly round.
 
     Returns:
@@ -164,15 +317,43 @@ def detect_opera(mouth_features,
 
     enabled = is_open_enough and not_big_smile
 
-    # 3) Continuous openness for pitch: map h into [0, 1]
-    if not enabled:
-        open_ratio = 0.0
-    else:
-        # clamp between open_thresh and max_open
-        clamped = max(open_thresh, min(h, max_open))
-        open_ratio = (clamped - open_thresh) / (max_open - open_thresh)
+    return enabled
 
-    return enabled, open_ratio
+def detect_swipe_gesture(history, direction="left",
+                         min_points=4, min_dx=40, max_dy=80):
+    """
+    Detect a horizontal swipe in a given direction from recent (x, y) points.
+
+    direction: "left" or "right"
+    Returns (is_swipe, dx, dy_span) where:
+      dx = end_x - start_x (positive if moved right)
+      dy_span = total vertical span
+    """
+
+    pts = [p for p in history if p is not None]
+    if len(pts) < min_points:
+        return False, 0.0, 0.0
+
+    xs = np.array([p[0] for p in pts], dtype=float)
+    ys = np.array([p[1] for p in pts], dtype=float)
+
+    start_x = xs[0]
+    end_x   = xs[-1]
+
+    dx = float(end_x - start_x)       # >0 means moved right
+    dy_span = float(ys.max() - ys.min())
+
+    if direction == "left":
+        cond = (-dx > min_dx) and (dy_span < max_dy)   # x decreasing a lot
+    else:  # "right"
+        cond = (dx > min_dx) and (dy_span < max_dy)    # x increasing a lot
+
+    if cond:
+        history.clear()  # pulse
+        return True, dx, dy_span
+
+    return False, dx, dy_span
+
 
 class MotionEngine:
     def __init__(self, on_event=None):
@@ -206,7 +387,22 @@ class MotionEngine:
         self.prev_double_thumb = False
         self.double_thumb_pulse = False
 
+        self.current_track = None
+        self.current_instrument = None
 
+        # Pending selections (wait for confirmation)
+        self.pending_track = None
+        self.pending_instrument = None
+
+        # OK gesture confirmation
+        self.ok_prev = False        # was OK sign present last frame?
+        self.ok_pulse = False       # True only on the first frame OK appears
+
+        self.point_history = deque(maxlen=35)  # for smoothing
+        self.current_pitch = 0.5
+        self.current_volume = 0.5
+
+    
     def update_neutral_curvature(self, mouth_features,
                                 max_open_height=0.015,
                                 max_abs_curv=0.02,
@@ -235,7 +431,7 @@ class MotionEngine:
                 "type": "expression_calibration",
                 "status": "done"
             })
-   
+
     def run(self):
         cap = cv2.VideoCapture(1)
         if not cap.isOpened():
@@ -247,6 +443,10 @@ class MotionEngine:
             if not ret:
                 break
 
+            # ===== per-frame state =====
+            left_ok_now = False
+            right_ok_now = False
+
             # Flip the frame horizontally so it feels more natural (like a mirror)
             frame = cv2.flip(frame, 1)
 
@@ -256,10 +456,18 @@ class MotionEngine:
             # -------------- PROCESS HANDS --------------
             results = self.hands.process(frame_rgb)
             thumbs_up_count = 0
-            max_fingers = 0
 
-            # If hands are detected, draw landmarks and count fingers
+            # candidates seen in THIS frame
+            right_candidate_track = None
+            left_candidate_instrument = None
+            pointer_added_this_frame = False
+
             if results.multi_hand_landmarks:
+                h, w, _ = frame.shape
+
+                right_candidate_track = 0
+                left_candidate_instrument = 0
+
                 for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
                     # Draw landmarks
                     self.mp_drawing.draw_landmarks(
@@ -267,120 +475,271 @@ class MotionEngine:
                         hand_landmarks,
                         self.mp_hands.HAND_CONNECTIONS
                     )
-                           
-                    finger_count = count_extended_fingers(hand_landmarks)
 
-                    # Track select: use max finger count
-                    if finger_count > max_fingers:
-                        max_fingers = finger_count
-                    
-                    # Thumbs up on this hand?
+                    # Get handedness label ("Left" or "Right")
+                    handedness = results.multi_handedness[i]
+                    hand_label = handedness.classification[0].label  # "Left" or "Right"
+
+                    # Draw label near wrist
+                    wrist = hand_landmarks.landmark[0]
+                    cx, cy = int(wrist.x * w), int(wrist.y * h)
+                    cv2.putText(
+                        frame,
+                        hand_label,
+                        (cx - 20, cy - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 255, 255),
+                        2
+                    )
+
+                    # Count fingers for this hand (for track/instrument selection)
+                    count = get_finger_number(hand_landmarks)
+
+                    # RIGHT HAND → pending track (1–5, with fist treated as 1)
+                    if hand_label == "Right" and count > 1:
+                        right_candidate_track = count
+                    if hand_label == "Right" and count == 0:
+                        right_candidate_track = 1  # fist = 1
+
+                    # LEFT HAND → pending instrument (1–5, with fist treated as 1)
+                    if hand_label == "Left" and (count > 1 or count == 0):
+                        # fist = 1, else 2–5
+                        left_candidate_instrument = (1 if count == 0 else count)
+
+                    # POINTER: any hand with exactly 1 finger (index only)
+                    if count == 1:
+                        index_tip = hand_landmarks.landmark[8]
+                        nx = float(index_tip.x)
+                        ny = float(index_tip.y)
+
+                        nx = max(0.0, min(1.0, nx))
+                        ny = max(0.0, min(1.0, ny))
+
+                        px_ptr = int(nx * w)
+                        py_ptr = int(ny * h)
+
+                        self.point_history.append((px_ptr, py_ptr))
+                        pointer_added_this_frame = True
+
+                        # map vertical position to pitch (top=1, bottom=0)
+                        self.current_pitch = 1.0 - ny
+
+                        # send event to frontend
+                        self.on_event({
+                            "type": "pointer_pitch",
+                            "x": nx,
+                            "y": ny,
+                            "pitch": self.current_pitch,
+                        })
+
+                    # ✅ OK sign: check independently of count
+                    ok_now_this_hand = is_ok_sign(hand_landmarks)
+                    if ok_now_this_hand:
+                        if hand_label == "Left":
+                            left_ok_now = True
+                        else:
+                            right_ok_now = True
+
+                        cv2.putText(
+                            frame,
+                            "OK SIGN",
+                            (cx - 20, cy + 30),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.7,
+                            (0, 255, 0),
+                            2
+                        )
+
+                    # Thumbs up (kept just as a fun debug)
                     if is_thumb_up(hand_landmarks):
                         thumbs_up_count += 1
-                    
-                # Emit an event if 1–4 fingers are up (you can extend to 5 when thumb logic is added)
-                if max_fingers > 0:
-                    self.on_event({
-                        "type": "track_select",
-                        "track": max_fingers
-                    })
-                
-                # Draw the count on the frame
+
+                # If no pointer this frame, break the trail
+                if not pointer_added_this_frame:
+                    self.point_history.append(None)
+
+                # Update pending debug text
+                if right_candidate_track is not None:
+                    self.pending_track = right_candidate_track
+                    cv2.putText(
+                        frame,
+                        f"Pending Track: {self.pending_track}",
+                        (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 255, 0),
+                        2
+                    )
+
+                if left_candidate_instrument is not None:
+                    self.pending_instrument = left_candidate_instrument
+                    cv2.putText(
+                        frame,
+                        f"Pending Instr: {self.pending_instrument}",
+                        (10, 60),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 200, 200),
+                        2
+                    )
+
+            else:
+                # No hands -> break pointer trail
+                self.point_history.append(None)
+
+            # -------------- OK CONTINUOUS DEBUG --------------
+            if left_ok_now:
                 cv2.putText(
                     frame,
-                    f"Fingers: {finger_count}",
-                    (10, 30),
+                    "LEFT OK ACTIVE",
+                    (10, 100),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 255, 0),
+                    0.7,
+                    (255, 0, 0),
+                    2
+                )
+            if right_ok_now:
+                cv2.putText(
+                    frame,
+                    "RIGHT OK ACTIVE",
+                    (10, 130),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 0, 255),
                     2
                 )
 
+            # -------------- DOUBLE THUMBS (optional debug) --------------
             is_double_thumb = (thumbs_up_count >= 2)
-
-            # Make this a "pulse" (true only on the first frame it appears)
             if not hasattr(self, "prev_double_thumb"):
                 self.prev_double_thumb = False
-
-            # Pulse = True only on the first frame where we see 2 thumbs up
             self.double_thumb_pulse = is_double_thumb and not self.prev_double_thumb
             self.prev_double_thumb = is_double_thumb
 
-            # debug text
             if is_double_thumb:
                 cv2.putText(
                     frame,
                     "DOUBLE THUMBS UP!",
-                    (10, 120),
+                    (10, 160),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
                     (0, 255, 255),
                     2
                 )
-       
-            # -------------- PROCESS FACE --------------#   
+
+            # -------------- PROCESS FACE (key + opera) --------------
             face_results = self.face_mesh.process(frame_rgb)
 
             if face_results.multi_face_landmarks:
                 face_landmarks = face_results.multi_face_landmarks[0]
                 mouth = get_mouth_features(face_landmarks)
-                
+
                 # Update neutral baseline in the early "neutral" phase
                 self.update_neutral_curvature(mouth)
 
                 if self.neutral_done:
-                    
                     curv = mouth["curvature"]
                     curv_delta = curv - self.neutral_curvature
 
-                    # Tune this threshold: more negative = stronger smile needed
-                    SMILE_DELTA = -0.01
+                    SMILE_DELTA = -0.01  # tweak as needed
 
                     if curv_delta < SMILE_DELTA:
-                        # Big smile -> MAJOR
                         self.candidate_key = "major"
                     else:
-                        # Neutral or corners down -> MINOR
                         self.candidate_key = "minor"
                 else:
-                    # While calibrating, we can just stay in MINOR
-                    self.candidate_key  = "minor"
+                    self.candidate_key = "minor"
 
-                # If key changed, lock in new state and send event once
-                if self.neutral_done and self.double_thumb_pulse:
+                # Confirm key whenever ANY OK is being held (either hand)
+                if self.neutral_done and (left_ok_now or right_ok_now):
                     if self.candidate_key != self.key_mode:
                         self.key_mode = self.candidate_key
                         self.on_event({
                             "type": "key_mode",
-                            "value": self.key_mode   # "major" or "minor"
+                            "value": self.key_mode
                         })
-                            
+
                 cv2.putText(
                     frame,
                     f"Key: {self.key_mode} (cand: {self.candidate_key})",
-                    (10, 60),
+                    (10, 190),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
                     (255, 0, 0),
                     2
                 )
 
-                # --- OPERA DETECTION ---
-                opera_enabled, open_ratio = detect_opera(mouth)
+                opera_enabled = detect_opera(mouth)
                 self.on_event({
                     "type": "opera_mode",
                     "enabled": opera_enabled,
-                    "openness": open_ratio   # 0..1, how big the mouth is
                 })
                 cv2.putText(
                     frame,
-                    f"opera: {opera_enabled} open={open_ratio:.2f}",
-                    (10, 90),
+                    f"opera: {opera_enabled}",
+                    (10, 220),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
                     (255, 0, 0),
                     2
                 )
+
+            # -------------- APPLY OK-CONFIRMED CHANGES (CONTINUOUS) --------------
+            # LEFT OK → confirm TRACK
+            if left_ok_now:
+                if self.pending_track is not None and self.pending_track != self.current_track:
+                    self.current_track = self.pending_track
+                    self.on_event({
+                        "type": "track_select",
+                        "track": self.current_track
+                    })
+
+            # RIGHT OK → confirm INSTRUMENT
+            if right_ok_now:
+                if self.pending_instrument is not None and self.pending_instrument != self.current_instrument:
+                    self.current_instrument = self.pending_instrument
+                    self.on_event({
+                        "type": "instrument_select",
+                        "instrument": self.current_instrument
+                    })
+
+            # -------------- DRAW CURRENT TRACK / INSTRUMENT DEBUG --------------
+            if self.current_track is not None:
+                cv2.putText(
+                    frame,
+                    f"Current Track: {self.current_track}",
+                    (10, 250),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 255, 0),
+                    2
+                )
+
+            if self.current_instrument is not None:
+                cv2.putText(
+                    frame,
+                    f"Current Instr: {self.current_instrument}",
+                    (10, 280),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 200, 200),
+                    2
+                )
+
+            # -------------- DRAW POINTER TRAIL + PITCH --------------
+            frame = draw_point_history(frame, self.point_history)
+
+            cv2.putText(
+                frame,
+                f"Pitch: {self.current_pitch:.2f}",
+                (10, 310),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 150, 255),
+                2
+            )
+            
 
             # --- SHOW FRAME + EXIT KEY ---
             cv2.imshow("Motion Debug", frame)
@@ -390,12 +749,10 @@ class MotionEngine:
         cap.release()
         cv2.destroyAllWindows()
 
-
-
+            
 def main():
-    engine = MotionEngine()
+    engine = MotionEngine()  
     engine.run()
-
 
 if __name__ == "__main__":
     main()
