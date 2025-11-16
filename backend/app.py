@@ -114,6 +114,10 @@ def process_single_frame(frame):
                     'rock': is_rock,
                 }
             })
+    else:
+        # No hands detected - reset pending and current instrument
+        motion_engine.pending_instrument = None
+        motion_engine.current_instrument = None
     
     # Process face for expression/key mode
     # if face_results.multi_face_landmarks:

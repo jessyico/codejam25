@@ -82,7 +82,7 @@ function FitbitConnector({ onBpmChange }) {
 
       const data = await res.json();
       console.log("[Fitbit] Response JSON:", data);
-      setRawJson(data); // so you can inspect it on screen while debugging
+      // setRawJson(data); // so you can inspect it on screen while debugging
 
       let currentBpm = null;
 

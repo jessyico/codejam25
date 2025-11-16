@@ -8,11 +8,91 @@ export default function CameraFeed({ onMotionData }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const animationFrameRef = useRef(null);
 
+  // Define drawOverlay function before it's used
+  const drawOverlay = (ctx, data, width, height) => {
+    // Save context and flip horizontally to match mirrored display
+    ctx.save();
+    ctx.scale(-1, 1); // Flip horizontally
+    ctx.translate(-width, 0); // Move back into view
+    
+    // Draw hand landmarks
+    if (data.hands && data.hands.length > 0) {
+      data.hands.forEach(hand => {
+        ctx.fillStyle = hand.label === 'Left' ? '#ed78d2ff' : '#61df9cff';
+        ctx.strokeStyle = hand.label === 'Left' ? '#ed78d2ff' : '#61df9cff';
+        ctx.lineWidth = 2;
+
+        // Draw points
+        hand.landmarks.forEach(lm => {
+          // Flip x to match mirrored canvas display
+          const x = (1 - lm.x) * width;
+          const y = lm.y * height;
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+
+        // Draw hand connections
+        const connections = [
+          [0, 1], [1, 2], [2, 3], [3, 4], // Thumb
+          [0, 5], [5, 6], [6, 7], [7, 8], // Index
+          [0, 9], [9, 10], [10, 11], [11, 12], // Middle
+          [0, 13], [13, 14], [14, 15], [15, 16], // Ring
+          [0, 17], [17, 18], [18, 19], [19, 20], // Pinky
+          [5, 9], [9, 13], [13, 17], // Palm
+        ];
+
+        connections.forEach(([i, j]) => {
+          const p1 = hand.landmarks[i];
+          const p2 = hand.landmarks[j];
+          ctx.beginPath();
+          // Flip x to match mirrored canvas display
+          ctx.moveTo((1 - p1.x) * width, p1.y * height);
+          ctx.lineTo((1 - p2.x) * width, p2.y * height);
+          ctx.stroke();
+        });
+
+        // Draw label
+        const wrist = hand.landmarks[0];
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 16px Arial';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 3;
+        const label = `(${hand.finger_count} fingers)`;
+        // Flip x to match mirrored canvas display
+        ctx.strokeText(label, (1 - wrist.x) * width - 30, wrist.y * height - 10);
+        ctx.fillText(label, (1 - wrist.x) * width - 30, wrist.y * height - 10);
+
+        // Show gestures
+        if (hand.gestures.ok_sign) {
+          ctx.strokeText('✓ OK!', (1 - wrist.x) * width - 20, wrist.y * height + 30);
+          ctx.fillText('✓ OK!', (1 - wrist.x) * width - 20, wrist.y * height + 30);
+        }
+      });
+    }
+
+    // Draw info overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(10, 10, 250, 50);
+    ctx.fillStyle = 'white';
+    ctx.font = '14px monospace';
+    ctx.fillText(`Instrument: ${data.current_instrument || 'none'}`, 20, 30);
+    if (data.face && data.face.opera_enabled) {
+      ctx.fillText('🎵 OPERA MODE ACTIVE', 20, 50);
+    }
+    if (data.face && !data.face.neutral_done) {
+      ctx.fillText('⚠️ Calibrating...', 20, 70);
+    }
+    
+    // Restore context to undo flip
+    ctx.restore();
+  };
+
   useEffect(() => {
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "user", width: 640, height: 480 }
+            video: { facingMode: "user", width: 560, height: 370 }
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -44,6 +124,7 @@ export default function CameraFeed({ onMotionData }) {
 
     const renderLoop = () => {
       if (!isActive) return;
+
       if (video.readyState >= video.HAVE_CURRENT_DATA) {
         // Set canvas size on first frame
         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
@@ -129,87 +210,6 @@ export default function CameraFeed({ onMotionData }) {
 
     return () => clearInterval(interval);
   }, [onMotionData, isProcessing]);
-
-  const drawOverlay = (ctx, data, width, height) => {
-    // Save context and flip horizontally to match mirrored display
-    ctx.save();
-    ctx.scale(-1, 1); // Flip horizontally
-    ctx.translate(-width, 0); // Move back into view
-    
-    // Draw hand landmarks
-    if (data.hands && data.hands.length > 0) {
-      data.hands.forEach(hand => {
-        ctx.fillStyle = hand.label === 'Left' ? '#ed78d2ff' : '#61df9cff';
-        ctx.strokeStyle = hand.label === 'Left' ? '#ed78d2ff' : '#61df9cff';
-        ctx.lineWidth = 2;
-
-        // Draw points
-        hand.landmarks.forEach(lm => {
-          // Flip x to match mirrored canvas display
-          const x = (1 - lm.x) * width;
-          const y = lm.y * height;
-          ctx.beginPath();
-          ctx.arc(x, y, 4, 0, 2 * Math.PI);
-          ctx.fill();
-        });
-
-        // Draw hand connections
-        const connections = [
-          [0, 1], [1, 2], [2, 3], [3, 4], // Thumb
-          [0, 5], [5, 6], [6, 7], [7, 8], // Index
-          [0, 9], [9, 10], [10, 11], [11, 12], // Middle
-          [0, 13], [13, 14], [14, 15], [15, 16], // Ring
-          [0, 17], [17, 18], [18, 19], [19, 20], // Pinky
-          [5, 9], [9, 13], [13, 17], // Palm
-        ];
-
-        connections.forEach(([i, j]) => {
-          const p1 = hand.landmarks[i];
-          const p2 = hand.landmarks[j];
-          ctx.beginPath();
-          // Flip x to match mirrored canvas display
-          ctx.moveTo((1 - p1.x) * width, p1.y * height);
-          ctx.lineTo((1 - p2.x) * width, p2.y * height);
-          ctx.stroke();
-        });
-
-        // Draw label
-        const wrist = hand.landmarks[0];
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 16px Arial';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 3;
-        const label = `(${hand.finger_count} fingers)`;
-        // Flip x to match mirrored canvas display
-        ctx.strokeText(label, (1 - wrist.x) * width - 30, wrist.y * height - 10);
-        ctx.fillText(label, (1 - wrist.x) * width - 30, wrist.y * height - 10);
-
-        // Show gestures
-        if (hand.gestures.ok_sign) {
-          ctx.strokeText('✓ OK!', (1 - wrist.x) * width - 20, wrist.y * height + 30);
-          ctx.fillText('✓ OK!', (1 - wrist.x) * width - 20, wrist.y * height + 30);
-        }
-      });
-    }
-
-    // Draw info overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(10, 10, 250, 50);
-    ctx.fillStyle = 'white';
-    ctx.font = '14px monospace';
-    // ctx.fillText(`Pitch: ${(data.pitch || 0).toFixed(2)}`, 20, 50);
-    //ctx.fillText(`Track: ${data.current_track || 'none'}`, 50, 50);
-    ctx.fillText(`Instrument: ${data.current_instrument || 'none'}`, 20, 90);
-    if (data.face && data.face.opera_enabled) {
-      ctx.fillText('🎵 OPERA MODE ACTIVE', 20, 110);
-    }
-    if (data.face && !data.face.neutral_done) {
-      ctx.fillText('⚠️ Calibrating...', 20, 130);
-    }
-    
-    // Restore context to undo flip
-    ctx.restore();
-  };
 
   return (
     <div className="camera-container" style={{ position: 'relative' }}>
