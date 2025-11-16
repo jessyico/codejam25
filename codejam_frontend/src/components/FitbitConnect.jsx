@@ -129,7 +129,7 @@ function FitbitConnector({ onBpmChange }) {
     if (!accessToken) return;
     const interval = setInterval(() => {
        fetchHeartRate();
-     }, 60000); // 10,000 ms = 10 seconds
+     }, 20000); // 10,000 ms = 10 seconds
 
      return () => clearInterval(interval);
    }, [accessToken]);
