@@ -195,12 +195,10 @@ export default function CameraFeed({ onMotionData }) {
 
     // Draw info overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(10, 10, 180, 80);
+    ctx.fillRect(10, 10, 250, 50);
     ctx.fillStyle = 'white';
     ctx.font = '14px monospace';
-    // ctx.fillText(`Pitch: ${(data.pitch || 0).toFixed(2)}`, 20, 50);
-    ctx.fillText(`Track: ${data.current_track || 'none'}`, 50, 50);
-    //ctx.fillText(`Instrument: ${data.current_instrument || 'none'}`, 20, 90);
+    ctx.fillText(`Instrument: ${data.current_instrument || 'none'}`, 20, 30);
     if (data.face && data.face.opera_enabled) {
       ctx.fillText('🎵 OPERA MODE ACTIVE', 20, 110);
     }
