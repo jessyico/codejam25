@@ -417,7 +417,6 @@ class MotionEngine:
         self.ok_pulse = False       # True only on the first frame OK appears
 
         self.point_history = deque(maxlen=35)  # for smoothing
-        self.current_pitch = 0.5
         self.current_volume = 0.5
 
 
@@ -531,15 +530,15 @@ class MotionEngine:
                         self.point_history.append((px_ptr, py_ptr))
                         pointer_added_this_frame = True
 
-                        # map vertical position to pitch (top=1, bottom=0)
-                        self.current_pitch = 1.0 - ny
+                        # map vertical position to volume (top=1, bottom=0)
+                        self.current_volume = 1.0 - ny
 
                         # send event to frontend
                         self.on_event({
-                            "type": "pointer_pitch",
+                            "type": "pointer_volume",
                             "x": nx,
                             "y": ny,
-                            "pitch": self.current_pitch,
+                            "volume": self.current_volume,
                         })
 
                     # OK sign: check independently of count
@@ -772,12 +771,12 @@ class MotionEngine:
                     2
                 )
 
-            # -------------- DRAW POINTER TRAIL + PITCH --------------
+            # -------------- DRAW POINTER TRAIL --------------
             frame = draw_point_history(frame, self.point_history)
 
             cv2.putText(
                 frame,
-                f"Pitch: {self.current_pitch:.2f}",
+                f"Volume: {self.current_volume:.2f}",
                 (10, 310),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
@@ -787,9 +786,9 @@ class MotionEngine:
             
 
             # --- SHOW FRAME + EXIT KEY ---
-            # cv2.imshow("Motion Debug", frame)
-            # if cv2.waitKey(1) & 0xFF == ord('q'):
-            #     break
+            cv2.imshow("Motion Debug", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
         cap.release()
         # cv2.destroyAllWindows()
