@@ -1,3 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700;900&display=swap');
+.pixelify-sans {
+  font-family: "Pixelify Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+}
+
 .App {
   text-align: center;
   font-family: "Inconsolata", monospace;
@@ -7,15 +15,14 @@
   margin: 0;
 }
 
-.App h1 {
-  margin-top: 0;
-  padding-top: 20px;
-}
-
 .App img {
   margin-top: 0;
 }
 
+.App h1 {
+  margin-top: 0;
+  padding-top: 2px;
+}
 
 .instrument-container {
   width: 100%;

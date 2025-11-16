@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 
 // import Heart from "./components/Heart";
@@ -45,13 +45,6 @@ function App() {
   const [currentTheme, setCurrentTheme] = useState("jazz");
   const [lastShuffleState, setLastShuffleState] = useState(false);
   const [shuffleCooldown, setShuffleCooldown] = useState(false);
-  const MIN_DB = -60;
-  const MAX_DB = 6;
-  const [isPlaying, setIsPlaying] = useState(true);
-  const isPlayingRef = useRef(true);
-  const savedVolumesRef = useRef(null);
-  const [masterVolume, setMasterVolume] = useState(0);
-  const playToggleRef = useRef(false);
 
   const themes = ["jazz", "house", "chill", "rock"];
 
@@ -74,64 +67,6 @@ function App() {
     console.log('Motion data received:', data);
     console.log('Current instrument from backend:', data.current_instrument);
     console.log('Instrument counters:', instrumentCounters);
-
-    // log play_toggle state changes
-    const playToggleNow = data.play_toggle === true;
-    const wasPlayToggleBefore = playToggleRef.current;
-    if (playToggleNow !== wasPlayToggleBefore) {
-      console.log(
-        `play_toggle: ${wasPlayToggleBefore} → ${playToggleNow}, isPlaying: ${isPlayingRef.current}`
-      );
-}
-    // two-fist play/pause toggle (RISING EDGE ONLY: false → true)
-    if (playToggleNow && !wasPlayToggleBefore) {
-      console.log("🎵 TOGGLE triggered");
-      const newPlayState = !isPlayingRef.current;
-      isPlayingRef.current = newPlayState;
-
-      if (newPlayState === false) {
-        // Pausing: save current volumes and mute everything
-        savedVolumesRef.current = { ...volumes };
-        const muted = {};
-        Object.keys(volumes).forEach((name) => {
-          muted[name] = MIN_DB;
-          instrumentManager.setVolume(name, MIN_DB);
-        });
-        setVolumes(muted);
-        setMasterVolume(0);
-      } else {
-        // Resuming: restore volumes
-        const restored = savedVolumesRef.current || volumes;
-        Object.entries(restored).forEach(([name, value]) => {
-          instrumentManager.setVolume(name, value);
-        });
-        setVolumes(restored);
-      }
-
-      setIsPlaying(newPlayState);
-    }
-
-    playToggleRef.current = playToggleNow;
-
-    // 🔊 Update volume from motion tracking
-    if (typeof data.volume === "number" && isPlayingRef.current) {
-      const dbValue = MIN_DB + data.volume * (MAX_DB - MIN_DB);
-      const normalized = Math.round(1 + data.volume * 99);
-      setMasterVolume(normalized);
-
-      setVolumes((prev) => ({
-        ...prev,
-        keyboard: dbValue,
-        guitar: dbValue,
-        bass: dbValue,
-        percussion: dbValue,
-      }));
-
-      ["keyboard", "guitar", "bass", "percussion"].forEach((name) => {
-        instrumentManager.setVolume(name, dbValue);
-      });
-    }
-
     
     // Handle shuffle gesture (rock sign)
     if (data.shuffle_triggered && !lastShuffleState && !shuffleCooldown) {
@@ -280,19 +215,43 @@ return (
       <FitbitConnector onBpmChange={setBpm} />
     </div>
 
-    {/* Bottom Right Text */}
-    <div
-      className="pixelify-sans"
-      style={{
-      fontSize: "48px",
-      marginTop: "40px",
-      textAlign: "left",
-      lineHeight: "1.2",
-      paddingLeft: "130px",
-      paddingBottom: "18px",
-    }}
-    >
-      Listen to your heart...
+    {/* Text and Theme Display Row */}
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 130px", marginTop: "40px", marginBottom: "18px", maxWidth: "1400px", margin: "40px auto 18px auto" }}>
+      {/* Bottom Left Text */}
+      <div
+        className="pixelify-sans"
+        style={{
+          fontSize: "48px",
+          textAlign: "left",
+          lineHeight: "1.2",
+        }}
+      >
+        Listen to your heart...
+      </div>
+
+      {/* Current Theme Display */}
+      <div 
+        className="pixelify-sans"
+        style={{
+          background: currentTheme === "jazz" ? "linear-gradient(135deg, #556bc3ff 0%, #8352b4ff 100%)" :
+                      currentTheme === "house" ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)" :
+                      currentTheme === "chill" ? "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" :
+                      "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+          padding: "15px 30px",
+          borderRadius: "20px",
+          fontSize: "28px",
+          fontWeight: "bold",
+          color: "white",
+          textShadow: "2px 2px 4px rgba(0,0,0,0.3)",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+          textTransform: "uppercase",
+          letterSpacing: "2px",
+          animation: "pulse 2s ease-in-out infinite",
+          marginRight: "120px",
+        }}
+      >
+        🎵 {currentTheme} Vibes 🎵
+      </div>
     </div>
 
     {/* Main Content - Two Column Layout */}
@@ -360,30 +319,7 @@ return (
       </div>
 
       {/* Right Side - Guidelines */}
-      <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", paddingRight: "120px", gap: "15px" }}>
-        {/* Current Theme Display */}
-        <div 
-          className="pixelify-sans"
-          style={{
-            background: currentTheme === "jazz" ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" :
-                        currentTheme === "house" ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)" :
-                        currentTheme === "chill" ? "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" :
-                        "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-            padding: "15px 30px",
-            borderRadius: "20px",
-            fontSize: "28px",
-            fontWeight: "bold",
-            color: "white",
-            textShadow: "2px 2px 4px rgba(0,0,0,0.3)",
-            boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
-            textTransform: "uppercase",
-            letterSpacing: "2px",
-            animation: "pulse 2s ease-in-out infinite",
-          }}
-        >
-          🎵 {currentTheme} Vibes 🎵
-        </div>
-        
+      <div style={{ flex: "0 0 auto", display: "flex", alignItems: "flex-start", paddingRight: "120px" }}>
         <img
           src={guideline}
           alt="guideline"

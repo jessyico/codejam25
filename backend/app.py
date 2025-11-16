@@ -120,18 +120,12 @@ def process_single_frame(frame):
             if is_fist_gesture:
                 fist_count += 1
             
-            if finger_count == 1: # newest ver.
-                index_tip = hand_landmarks.landmark[8]
-                ny = float(index_tip.y)
-
-                motion_engine.current_volume = 1.0 - ny
-
-                response['pointer'] = {
-                    'x': float(index_tip.x),
-                    'y': float(index_tip.y),
-                    'hand': hand_label,
-                }
-            
+            # Track wrist positions for volume control
+            wrist = hand_landmarks.landmark[0]
+            if hand_label == "Left":
+                left_wrist_y = float(wrist.y)
+            elif hand_label == "Right":
+                right_wrist_y = float(wrist.y)
             
             # Update pending selections based on hand
             if hand_label == "Right" and 4>= finger_count > 0:
@@ -154,17 +148,6 @@ def process_single_frame(frame):
                     'y': float(index_tip.y)
                 }
             
-            # Play/Pause toggle: detect two fists
-            two_fists_now = (fist_count >= 2)
-            two_fists_pulse = two_fists_now and not motion_engine.prev_two_fists
-            if two_fists_pulse:
-                # Rising edge - toggle play state
-                motion_engine.is_playing = not motion_engine.is_playing
-            
-            response['play_toggle'] = two_fists_pulse
-            response['playing'] = bool(motion_engine.is_playing)
-            motion_engine.prev_two_fists = two_fists_now
-            
             response['hands'].append({
                 'label': hand_label,
                 'landmarks': landmarks,
@@ -176,14 +159,26 @@ def process_single_frame(frame):
                     'rock': is_rock,
                 }
             })
-            response['volume'] = float(motion_engine.current_volume)
-            
     else:
         # No hands detected - reset pending and current instrument
         motion_engine.pending_instrument = None
         motion_engine.current_instrument = None
     
-
+    # Volume control: based on average wrist height when both hands visible
+    if left_wrist_y is not None and right_wrist_y is not None:
+        avg_y = (left_wrist_y + right_wrist_y) / 2.0
+        # Invert: top of screen (y=0) = high volume, bottom (y=1) = low volume
+        motion_engine.current_volume = 1.0 - avg_y
+        # Clamp between 0 and 1
+        motion_engine.current_volume = max(0.0, min(1.0, motion_engine.current_volume))
+    
+    # Play/Pause toggle: detect two fists
+    two_fists_now = (fist_count >= 2)
+    if two_fists_now and not motion_engine.prev_two_fists:
+        # Rising edge - toggle play state
+        motion_engine.is_playing = not motion_engine.is_playing
+        response['play_toggle'] = True
+    motion_engine.prev_two_fists = two_fists_now
     
     # Shuffle trigger: detect rock gesture (rising edge)
     if rock_now and not motion_engine.prev_rock_any:
