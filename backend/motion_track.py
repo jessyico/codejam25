@@ -200,20 +200,14 @@ def get_mouth_features(face_landmarks):
         "shape_ratio": shape_ratio,
     }
 
-def classify_expression(mouth_features, smile_thresh=-0.01, frown_thresh=0.01):
+def is_fist(hand_landmarks):
     """
-    Very simple: based on curvature only.
-    curvature < smile_thresh => 'smile'
-    curvature > frown_thresh => 'frown'
-    else => 'neutral'
+    Very simple fist detector:
+    - All fingers (thumb, index, middle, ring, pinky) are NOT extended.
     """
-    curv = mouth_features["curvature"]
-    if curv < smile_thresh:
-        return "smile"
-    elif curv > frown_thresh:
-        return "frown"
-    else:
-        return "neutral"
+    states = get_finger_states(hand_landmarks)
+    # If no finger is extended, treat as fist
+    return not any(states.values())
 
 def draw_point_history(image, point_history):
     """
@@ -292,67 +286,95 @@ def detect_circle_direction(point_history,
     return direction
 
     
-def detect_opera(mouth_features,
-                 open_thresh=0.03,
-                 smile_curv_limit=-0.01):
+# def detect_opera(mouth_features,
+#                  open_thresh=0.03,
+#                  smile_curv_limit=-0.01):
+#     """
+#     Decide if 'opera' mouth is active and how open it is.
+
+#     Rules:
+#     - Must be clearly open: mouth_height > open_thresh
+#     - Shape doesn't need to be perfectly round.
+
+#     Returns:
+#         enabled (bool), open_ratio (0..1)
+#     """
+#     h = mouth_features["mouth_height"]
+#     curv = mouth_features["curvature"]
+
+#     # 1) Open enough vertically
+#     is_open_enough = h > open_thresh
+
+#     # 2) Not a huge smile (filter out smile-with-teeth)
+#     not_big_smile = curv > smile_curv_limit
+#     # e.g. -0.05 is big smile, -0.005 is mild → we only reject big ones
+
+#     enabled = is_open_enough and not_big_smile
+
+#     return enabled
+
+# def detect_swipe_gesture(history, direction="left",
+#                          min_points=4, min_dx=40, max_dy=80):
+#     """
+#     Detect a horizontal swipe in a given direction from recent (x, y) points.
+
+#     direction: "left" or "right"
+#     Returns (is_swipe, dx, dy_span) where:
+#       dx = end_x - start_x (positive if moved right)
+#       dy_span = total vertical span
+#     """
+
+#     pts = [p for p in history if p is not None]
+#     if len(pts) < min_points:
+#         return False, 0.0, 0.0
+
+#     xs = np.array([p[0] for p in pts], dtype=float)
+#     ys = np.array([p[1] for p in pts], dtype=float)
+
+#     start_x = xs[0]
+#     end_x   = xs[-1]
+
+#     dx = float(end_x - start_x)       # >0 means moved right
+#     dy_span = float(ys.max() - ys.min())
+
+#     if direction == "left":
+#         cond = (-dx > min_dx) and (dy_span < max_dy)   # x decreasing a lot
+#     else:  # "right"
+#         cond = (dx > min_dx) and (dy_span < max_dy)    # x increasing a lot
+
+#     if cond:
+#         history.clear()  # pulse
+#         return True, dx, dy_span
+
+#     return False, dx, dy_span
+
+def is_rock_sign(hand_landmarks):
     """
-    Decide if 'opera' mouth is active and how open it is.
+    Detect a simple 'rock on' / horns gesture:
 
-    Rules:
-    - Must be clearly open: mouth_height > open_thresh
-    - Shape doesn't need to be perfectly round.
+    - Index extended
+    - Pinky extended
+    - Middle + Ring NOT extended
+    - Thumb preferably not extended (to avoid looking like 3–4)
 
-    Returns:
-        enabled (bool), open_ratio (0..1)
+    You can relax the thumb condition later if it's too strict.
     """
-    h = mouth_features["mouth_height"]
-    curv = mouth_features["curvature"]
+    states = get_finger_states(hand_landmarks)
 
-    # 1) Open enough vertically
-    is_open_enough = h > open_thresh
+    thumb  = states["thumb"]
+    index  = states["index"]
+    middle = states["middle"]
+    ring   = states["ring"]
+    pinky  = states["pinky"]
 
-    # 2) Not a huge smile (filter out smile-with-teeth)
-    not_big_smile = curv > smile_curv_limit
-    # e.g. -0.05 is big smile, -0.005 is mild → we only reject big ones
+    index_ok = index
+    pinky_ok = pinky
+    thumb_ok = thumb   
+    middle_down = not middle
+    ring_down = not ring
+    
 
-    enabled = is_open_enough and not_big_smile
-
-    return enabled
-
-def detect_swipe_gesture(history, direction="left",
-                         min_points=4, min_dx=40, max_dy=80):
-    """
-    Detect a horizontal swipe in a given direction from recent (x, y) points.
-
-    direction: "left" or "right"
-    Returns (is_swipe, dx, dy_span) where:
-      dx = end_x - start_x (positive if moved right)
-      dy_span = total vertical span
-    """
-
-    pts = [p for p in history if p is not None]
-    if len(pts) < min_points:
-        return False, 0.0, 0.0
-
-    xs = np.array([p[0] for p in pts], dtype=float)
-    ys = np.array([p[1] for p in pts], dtype=float)
-
-    start_x = xs[0]
-    end_x   = xs[-1]
-
-    dx = float(end_x - start_x)       # >0 means moved right
-    dy_span = float(ys.max() - ys.min())
-
-    if direction == "left":
-        cond = (-dx > min_dx) and (dy_span < max_dy)   # x decreasing a lot
-    else:  # "right"
-        cond = (dx > min_dx) and (dy_span < max_dy)    # x increasing a lot
-
-    if cond:
-        history.clear()  # pulse
-        return True, dx, dy_span
-
-    return False, dx, dy_span
+    return index_ok and thumb_ok and pinky_ok and middle_down and ring_down
 
 
 class MotionEngine:
@@ -375,15 +397,13 @@ class MotionEngine:
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5,
         )
-        # self.neutral_curvature = 0.0
-        # self.neutral_samples = []
-        # self.neutral_frames = 0
-        # self.neutral_done = False
 
-        # Key mode state: we start in MINOR (no smile yet)
-        self.key_mode = "minor"        # committed key: "major" or "minor"
-        self.candidate_key = "minor"   # based on current smile
-        
+        self.prev_rock_any = False   # you already have this
+        self.prev_two_fists = False   # for fist pulse
+
+        self.is_playing = True       # start in "playing" state (or False if you prefer)
+
+
         self.prev_double_thumb = False
         self.double_thumb_pulse = False
 
@@ -399,6 +419,8 @@ class MotionEngine:
         self.point_history = deque(maxlen=35)  # for smoothing
         self.current_pitch = 0.5
         self.current_volume = 0.5
+
+        self.prev_rock_any = False 
 
     
     def update_neutral_curvature(self, mouth_features,
@@ -444,6 +466,8 @@ class MotionEngine:
             # ===== per-frame state =====
             left_ok_now = False
             right_ok_now = False
+            any_rock_now = False
+            fists_count = 0
 
             # Flip the frame horizontally so it feels more natural (like a mirror)
             frame = cv2.flip(frame, 1)
@@ -536,10 +560,39 @@ class MotionEngine:
                             (0, 255, 0),
                             2
                         )
+                    
+                    
+                    # rock hand -> candidate shuffle
+                    rock_this_hand = is_rock_sign(hand_landmarks)
+                    if rock_this_hand:
+                        any_rock_now = True
+                        cv2.putText(
+                            frame,
+                            "ROCK 🤘",
+                            (cx - 20, cy + 55),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.7,
+                            (255, 0, 255),
+                            2
+                        )   
 
+                    # Fist → candidate play/pause (we’ll require 2 fists total)
+                    fist_this_hand = is_fist(hand_landmarks)
+                    if fist_this_hand:
+                        fists_count += 1
+                        cv2.putText(
+                            frame,
+                            "FIST",
+                            (cx - 20, cy + 80),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.7,
+                            (0, 255, 255),
+                            2
+                        )
+                                
                     # Thumbs up (kept just as a fun debug)
-                    if is_thumb_up(hand_landmarks):
-                        thumbs_up_count += 1
+                    # if is_thumb_up(hand_landmarks):
+                    #     thumbs_up_count += 1
 
                 # If no pointer this frame, break the trail
                 if not pointer_added_this_frame:
@@ -564,6 +617,25 @@ class MotionEngine:
             else:
                 # No hands -> break pointer trail
                 self.point_history.append(None)
+            
+            # ---------- ROCK PULSE + SHUFFLE ----------
+            rock_pulse = any_rock_now and not self.prev_rock_any
+            self.prev_rock_any = any_rock_now
+
+            if rock_pulse:
+                # fire shuffle event once, when the gesture first appears
+                self.on_event({"type": "shuffle"})
+
+                # optional debug text so you see the pulse on screen
+                cv2.putText(
+                    frame,
+                    "SHUFFLE TRIGGERED!",
+                    (10, 340),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (255, 0, 255),
+                    2
+                )
 
             # -------------- OK CONTINUOUS DEBUG --------------
             if left_ok_now:
@@ -584,6 +656,34 @@ class MotionEngine:
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
                     (0, 0, 255),
+                    2
+                )
+
+            # ---------- TWO-FISTS PULSE + PLAY/PAUSE ----------
+            two_fists_now = (fists_count >= 2)
+
+            two_fists_pulse = two_fists_now and not self.prev_two_fists
+            self.prev_two_fists = two_fists_now
+
+            if two_fists_pulse:
+                # Toggle play/pause
+                self.is_playing = not self.is_playing
+
+                # Send event to frontend
+                self.on_event({
+                    "type": "play_state",
+                    "playing": self.is_playing
+                })
+
+                # Debug text to show the toggle
+                status = "PLAY" if self.is_playing else "PAUSE"
+                cv2.putText(
+                    frame,
+                    f"{status} TOGGLE (2 FISTS)",
+                    (10, 350),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 255, 255),
                     2
                 )
 
