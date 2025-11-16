@@ -9,6 +9,10 @@ import greenheart from "./assets/green_heart.webp";
 import purpleheart from "./assets/purple_heart.webp";
 import heartlogo from "./assets/heartjamlogo.png";
 import FitbitConnector from "./components/FitbitConnect";
+import drums from "./assets/drums_new.png";
+import bass_new from "./assets/bass_new.png";
+import guitar_new from "./assets/guitar_new.png";
+import piano_new from "./assets/piano_new.png";
 // import instrumentManager.js
 import instrumentManager from "./audio/instrumentManager.js";
 
@@ -25,17 +29,14 @@ function App() {
 <FitbitConnector onBpmChange={setBpm} />
 
 useEffect(() => {
-
     console.log(`BPM updated to: ${bpm}`);
     instrumentManager.setTempo(bpm);
- 
 }, [bpm]);
 
   // Load all instruments on mount
   useEffect(() => {
     const instruments = ["keyboard", "guitar", "bass", "percussion"];
     const themes = ["jazz", "chill", "rock", "house"];
-
     themes.forEach((theme) => {
       instruments.forEach((inst) => {
         instrumentManager.loadInstrument(
@@ -53,10 +54,17 @@ useEffect(() => {
   };
 
 return (
-    <div>
-      <h1 style={{ color: "pink", fontFamily: "Barriecito" }}>
-        Listen to your heart
-      </h1>
+  <div className="App"> {/* Start of App div */}
+<div style={{ textAlign: "center" }}>
+  <h1 style={{ color: "pink", fontFamily: "Barriecito" }}>
+    
+  </h1>
+  <img 
+    src={heartlogo} 
+    alt="Heart Jam Logo" 
+    style={{ width: "400px", height: "150px", marginTop: "10px" }} 
+  />
+
       {/* 🌈 THEME BUTTONS ADDED HERE */}
       <div style={{ marginBottom: "20px" }}>
         <button onClick={() => instrumentManager.setTheme("jazz")}>Jazz</button>
@@ -64,46 +72,34 @@ return (
         <button onClick={() => instrumentManager.setTheme("chill")}>Chill</button>
         <button onClick={() => instrumentManager.setTheme("rock")}>Rock</button>
       </div>
-      
       <FitbitConnector onBpmChange={setBpm} />
-      
-
-
-      <div className="instruments-container">
-        <Instrument
-          imgSrc={blueheart}
-          alt="blue heart"
-          onClick={() => {
-          instrumentManager.toggle('keyboard'); // template literal
-          }}
-        />
-        <Instrument
-          imgSrc={yellowheart}
-          alt="yellow heart"
-          onClick={() => {
-          instrumentManager.toggle('guitar'); // template literal
-          }}
-        />
-        <Instrument 
-          imgSrc={greenheart} 
-          alt="green heart" 
-          onClick={() => {
-          instrumentManager.toggle('percussion'); // template literal
-          }}
-        />
-        <Instrument
-          imgSrc={purpleheart}
-          alt="purple heart"
-          onClick={() => {
-          instrumentManager.toggle('bass'); // template literal
-          }}
-        />
-      </div>
-<p>Current BPM: {bpm}</p>
-<p>Current BPM: {bpm}</p>
       <CameraFeed />
-    <Heart bpm={bpm} />
 
+      <div className="instruments-container" style={{ display: "flex", justifyContent: "flex-start", gap: "10px",paddingLeft: "200px" }}>
+  {/* Left column */}
+  <div className="column" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+    <Instrument imgSrc={blueheart} alt="blue heart" onClick={() => instrumentManager.toggle('keyboard')} />
+    <Instrument imgSrc={yellowheart} alt="yellow heart" onClick={() => instrumentManager.toggle('guitar')} />
+    <Instrument imgSrc={greenheart} alt="percussion" onClick={() => instrumentManager.toggle('percussion')} />
+    <Instrument imgSrc={purpleheart} alt="bass" onClick={() => instrumentManager.toggle('bass')} />
+  </div>
+
+  {/* Right column */}
+  <div className="column" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+    <Instrument imgSrc={piano_new} alt="piano icon" 
+    style={{ height: "80px", width: "auto" }} 
+    />
+    <Instrument imgSrc={guitar_new} alt="guitar icon"
+    style={{ height: "5px", width: "auto" }}  />
+    <Instrument imgSrc={drums} alt="drums icon"
+    style={{ height: "80px", width: "auto" }}  />
+    <Instrument imgSrc={bass_new} alt="bass icon"
+    style={{ height: "80px", width: "auto" }}  />
+  </div>
+</div>
+
+    <Heart bpm={bpm} />
+   
       {/* Volume control */}
       {["keyboard", "guitar", "percussion", "bass"].map((inst) => (
         <div key={inst} style={{ marginTop: "15px", display: "flex", alignItems: "center" }}>
@@ -121,7 +117,7 @@ return (
         </div>
       ))}
     </div>
+    </div>
   );
 }
-
 export default App;
