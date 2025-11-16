@@ -44,7 +44,6 @@ export default function CameraFeed({ onMotionData }) {
 
     const renderLoop = () => {
       if (!isActive) return;
-
       if (video.readyState >= video.HAVE_CURRENT_DATA) {
         // Set canvas size on first frame
         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
@@ -199,8 +198,8 @@ export default function CameraFeed({ onMotionData }) {
     ctx.fillStyle = 'white';
     ctx.font = '14px monospace';
     // ctx.fillText(`Pitch: ${(data.pitch || 0).toFixed(2)}`, 20, 50);
-    ctx.fillText(`Track: ${data.current_track || 'none'}`, 50, 50);
-    //ctx.fillText(`Instrument: ${data.current_instrument || 'none'}`, 20, 90);
+    //ctx.fillText(`Track: ${data.current_track || 'none'}`, 50, 50);
+    ctx.fillText(`Instrument: ${data.current_instrument || 'none'}`, 20, 90);
     if (data.face && data.face.opera_enabled) {
       ctx.fillText('🎵 OPERA MODE ACTIVE', 20, 110);
     }

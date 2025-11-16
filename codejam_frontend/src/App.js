@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import CameraFeed from "./components/CameraFeed";
+
 import Heart from "./components/Heart";
 import Instrument from "./components/Instrument";
 import blueheart from "./assets/blue_heart.webp";
@@ -13,6 +13,7 @@ import drums from "./assets/drums_new.png";
 import bass_new from "./assets/bass_new.png";
 import guitar_new from "./assets/guitar_new.png";
 import piano_new from "./assets/piano_new.png";
+import CameraFeed from "./components/HandGestureCamera";
 // import instrumentManager.js
 import instrumentManager from "./audio/instrumentManager.js";
 
@@ -24,9 +25,25 @@ function App() {
     bass: 0,
     percussion: 0,
   });
+  const [motionData, setMotionData] = useState(null);
+  const [currentTrack, setCurrentTrack] = useState(null);
+
+  // Handle motion data from camera
+  const handleMotionData = (data) => {
+    setMotionData(data);
+    // Update app state from motion tracking
+    if (data.current_instrument !== null) setCurrentInstrument(data.current_instrument);
+    
+  };
+
+
+
+
 // Simulate incoming sensor data
 // Sync instruments to BPM
 <FitbitConnector onBpmChange={setBpm} />
+{/* Motion-tracked camera with gesture controls */}
+<CameraFeed onMotionData={handleMotionData} />
 
 useEffect(() => {
     console.log(`BPM updated to: ${bpm}`);
@@ -73,6 +90,7 @@ return (
         <button onClick={() => instrumentManager.setTheme("rock")}>Rock</button>
       </div>
       <FitbitConnector onBpmChange={setBpm} />
+      
       <CameraFeed />
 
       <div className="instruments-container" style={{ display: "flex", justifyContent: "flex-start", gap: "10px",paddingLeft: "200px" }}>
