@@ -375,10 +375,10 @@ class MotionEngine:
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5,
         )
-        self.neutral_curvature = 0.0
-        self.neutral_samples = []
-        self.neutral_frames = 0
-        self.neutral_done = False
+        # self.neutral_curvature = 0.0
+        # self.neutral_samples = []
+        # self.neutral_frames = 0
+        # self.neutral_done = False
 
         # Key mode state: we start in MINOR (no smile yet)
         self.key_mode = "minor"        # committed key: "major" or "minor"
@@ -387,11 +387,9 @@ class MotionEngine:
         self.prev_double_thumb = False
         self.double_thumb_pulse = False
 
-        self.current_track = None
         self.current_instrument = None
 
         # Pending selections (wait for confirmation)
-        self.pending_track = None
         self.pending_instrument = None
 
         # OK gesture confirmation
@@ -453,20 +451,15 @@ class MotionEngine:
             # Convert BGR (OpenCV) -> RGB (MediaPipe)
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
+            cue_hand_label = None          # "Left" or "Right" that is doing 1–4 fingers
+            pending_instrument_this_frame = None
             # -------------- PROCESS HANDS --------------
             results = self.hands.process(frame_rgb)
             thumbs_up_count = 0
-
-            # candidates seen in THIS frame
-            right_candidate_track = None
-            left_candidate_instrument = None
             pointer_added_this_frame = False
 
             if results.multi_hand_landmarks:
                 h, w, _ = frame.shape
-
-                right_candidate_track = 0
-                left_candidate_instrument = 0
 
                 for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
                     # Draw landmarks
@@ -493,15 +486,12 @@ class MotionEngine:
                         2
                     )
 
-                    # Count fingers for this hand (for track/instrument selection)
+                    # Count fingers for this hand (for instrument selection)
                     count = get_finger_number(hand_landmarks)
 
-                    # RIGHT HAND → pending track (1–5)
-                    if hand_label == "Right" and count > 0:
-                        right_candidate_track = count
-                    # LEFT HAND → pending instrument (1–5)
-                    if hand_label == "Left" and count > 0:
-                        left_candidate_instrument = count
+                    if 1 <= count <= 4 and cue_hand_label is None:
+                        cue_hand_label = hand_label       # "Left" or "Right"
+                        pending_instrument_this_frame = count
 
                     # POINTER: any hand with exactly 1 finger (index only)
                     if count == 1:
@@ -529,7 +519,7 @@ class MotionEngine:
                             "pitch": self.current_pitch,
                         })
 
-                    # ✅ OK sign: check independently of count
+                    # OK sign: check independently of count
                     ok_now_this_hand = is_ok_sign(hand_landmarks)
                     if ok_now_this_hand:
                         if hand_label == "Left":
@@ -555,25 +545,16 @@ class MotionEngine:
                 if not pointer_added_this_frame:
                     self.point_history.append(None)
 
-                # Update pending debug text
-                if right_candidate_track is not None:
-                    self.pending_track = right_candidate_track
-                    cv2.putText(
-                        frame,
-                        f"Pending Track: {self.pending_track}",
-                        (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (0, 255, 0),
-                        2
-                    )
+                # Show pending instrument (if we saw a new cue)
+                if pending_instrument_this_frame is not None:
+                    self.pending_instrument = pending_instrument_this_frame
 
-                if left_candidate_instrument is not None:
-                    self.pending_instrument = left_candidate_instrument
+
+                if self.pending_instrument is not None:
                     cv2.putText(
                         frame,
                         f"Pending Instr: {self.pending_instrument}",
-                        (10, 60),
+                        (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7,
                         (0, 200, 200),
@@ -607,111 +588,80 @@ class MotionEngine:
                 )
 
             # -------------- DOUBLE THUMBS (optional debug) --------------
-            is_double_thumb = (thumbs_up_count >= 2)
-            if not hasattr(self, "prev_double_thumb"):
-                self.prev_double_thumb = False
-            self.double_thumb_pulse = is_double_thumb and not self.prev_double_thumb
-            self.prev_double_thumb = is_double_thumb
+            # is_double_thumb = (thumbs_up_count >= 2)
+            # if not hasattr(self, "prev_double_thumb"):
+            #     self.prev_double_thumb = False
+            # self.double_thumb_pulse = is_double_thumb and not self.prev_double_thumb
+            # self.prev_double_thumb = is_double_thumb
 
-            if is_double_thumb:
-                cv2.putText(
-                    frame,
-                    "DOUBLE THUMBS UP!",
-                    (10, 160),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 255, 255),
-                    2
-                )
+            # if is_double_thumb:
+            #     cv2.putText(
+            #         frame,
+            #         "DOUBLE THUMBS UP!",
+            #         (10, 160),
+            #         cv2.FONT_HERSHEY_SIMPLEX,
+            #         0.7,
+            #         (0, 255, 255),
+            #         2
+            #     )
 
             # -------------- PROCESS FACE (key + opera) --------------
-            face_results = self.face_mesh.process(frame_rgb)
+            # face_results = self.face_mesh.process(frame_rgb)
 
-            if face_results.multi_face_landmarks:
-                face_landmarks = face_results.multi_face_landmarks[0]
-                mouth = get_mouth_features(face_landmarks)
+            # if face_results.multi_face_landmarks:
+            #     face_landmarks = face_results.multi_face_landmarks[0]
+            #     mouth = get_mouth_features(face_landmarks)
 
-                # Update neutral baseline in the early "neutral" phase
-                self.update_neutral_curvature(mouth)
+            #     # Update neutral baseline in the early "neutral" phase
+            #     self.update_neutral_curvature(mouth)
 
-                if self.neutral_done:
-                    curv = mouth["curvature"]
-                    curv_delta = curv - self.neutral_curvature
+            #     if self.neutral_done:
+            #         curv = mouth["curvature"]
+            #         curv_delta = curv - self.neutral_curvature
 
-                    SMILE_DELTA = -0.01  # tweak as needed
+            #         SMILE_DELTA = -0.01  # tweak as needed
 
-                    if curv_delta < SMILE_DELTA:
-                        self.candidate_key = "major"
-                    else:
-                        self.candidate_key = "minor"
-                else:
-                    self.candidate_key = "minor"
+            #         if curv_delta < SMILE_DELTA:
+            #             self.candidate_key = "major"
+            #         else:
+            #             self.candidate_key = "minor"
+            #     else:
+            #         self.candidate_key = "minor"
 
-                # Confirm key whenever ANY OK is being held (either hand)
-                if self.neutral_done and (left_ok_now or right_ok_now):
-                    if self.candidate_key != self.key_mode:
-                        self.key_mode = self.candidate_key
-                        self.on_event({
-                            "type": "key_mode",
-                            "value": self.key_mode
-                        })
 
-                cv2.putText(
-                    frame,
-                    f"Key: {self.key_mode} (cand: {self.candidate_key})",
-                    (10, 190),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 0, 0),
-                    2
-                )
-
-                opera_enabled = detect_opera(mouth)
-                self.on_event({
-                    "type": "opera_mode",
-                    "enabled": opera_enabled,
-                })
-                cv2.putText(
-                    frame,
-                    f"opera: {opera_enabled}",
-                    (10, 220),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 0, 0),
-                    2
-                )
+            #     opera_enabled = detect_opera(mouth)
+            #     self.on_event({
+            #         "type": "opera_mode",
+            #         "enabled": opera_enabled,
+            #     })
+            #     cv2.putText(
+            #         frame,
+            #         f"opera: {opera_enabled}",
+            #         (10, 220),
+            #         cv2.FONT_HERSHEY_SIMPLEX,
+            #         0.7,
+            #         (255, 0, 0),
+            #         2
+            #     )
 
             # -------------- APPLY OK-CONFIRMED CHANGES (CONTINUOUS) --------------
-            # LEFT OK → confirm TRACK
-            if left_ok_now:
-                if self.pending_track is not None and self.pending_track != self.current_track:
-                    self.current_track = self.pending_track
-                    self.on_event({
-                        "type": "track_select",
-                        "track": self.current_track
-                    })
 
             # RIGHT OK → confirm INSTRUMENT
-            if right_ok_now:
-                if self.pending_instrument is not None and self.pending_instrument != self.current_instrument:
+            confirm_ok = False
+            if cue_hand_label == "Left" and right_ok_now:
+                confirm_ok = True
+            elif cue_hand_label == "Right" and left_ok_now:
+                confirm_ok = True
+
+            if confirm_ok and self.pending_instrument is not None:
+                if self.pending_instrument != self.current_instrument:
                     self.current_instrument = self.pending_instrument
                     self.on_event({
                         "type": "instrument_select",
                         "instrument": self.current_instrument
                     })
 
-            # -------------- DRAW CURRENT TRACK / INSTRUMENT DEBUG --------------
-            if self.current_track is not None:
-                cv2.putText(
-                    frame,
-                    f"Current Track: {self.current_track}",
-                    (10, 250),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 255, 0),
-                    2
-                )
-
+            # -------------- DRAW CURRENT INSTRUMENT DEBUG --------------
             if self.current_instrument is not None:
                 cv2.putText(
                     frame,
