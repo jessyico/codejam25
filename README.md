@@ -29,7 +29,7 @@ cd codejam25
 2. Create + activate virtual environment
 ```bash
 python -m venv .venv
-source .venv/bin/activate # Windows: .venv\Scripts\activate
+source .venv/bin/activate # Windows: .venv/Scripts/activate
 ```
 
 3. Install dependencies
