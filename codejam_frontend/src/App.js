@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./App.css";
 
 // import Heart from "./components/Heart";
@@ -14,6 +14,7 @@ import bass_new from "./assets/bass_new.png";
 import guitar_new from "./assets/guitar_new.png";
 import piano_new from "./assets/piano_new.png";
 import CameraFeed from "./components/HandGestureCamera";
+import guideline from "./assets/guideline.png"
 // import instrumentManager.js
 import instrumentManager from "./audio/instrumentManager.js";
 
@@ -33,6 +34,7 @@ function App() {
     3: 0, // percussion
     4: 0, // bass
   });
+
   const [playingInstruments, setPlayingInstruments] = useState({
     keyboard: false,
     guitar: false,
@@ -40,6 +42,18 @@ function App() {
     percussion: false,
   });
   const [globalBeat, setGlobalBeat] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState("jazz");
+  const [lastShuffleState, setLastShuffleState] = useState(false);
+  const [shuffleCooldown, setShuffleCooldown] = useState(false);
+  const MIN_DB = -60;
+  const MAX_DB = 6;
+  const [isPlaying, setIsPlaying] = useState(true);
+  const isPlayingRef = useRef(true);
+  const savedVolumesRef = useRef(null);
+  const [masterVolume, setMasterVolume] = useState(0);
+  const playToggleRef = useRef(false);
+
+  const themes = ["jazz", "house", "chill", "rock"];
 
   // Global synchronized heartbeat
   useEffect(() => {
@@ -60,6 +74,82 @@ function App() {
     console.log('Motion data received:', data);
     console.log('Current instrument from backend:', data.current_instrument);
     console.log('Instrument counters:', instrumentCounters);
+
+    // log play_toggle state changes
+    const playToggleNow = data.play_toggle === true;
+    const wasPlayToggleBefore = playToggleRef.current;
+    if (playToggleNow !== wasPlayToggleBefore) {
+      console.log(
+        `play_toggle: ${wasPlayToggleBefore} → ${playToggleNow}, isPlaying: ${isPlayingRef.current}`
+      );
+}
+    // two-fist play/pause toggle (RISING EDGE ONLY: false → true)
+    if (playToggleNow && !wasPlayToggleBefore) {
+      console.log("🎵 TOGGLE triggered");
+      const newPlayState = !isPlayingRef.current;
+      isPlayingRef.current = newPlayState;
+
+      if (newPlayState === false) {
+        // Pausing: save current volumes and mute everything
+        savedVolumesRef.current = { ...volumes };
+        const muted = {};
+        Object.keys(volumes).forEach((name) => {
+          muted[name] = MIN_DB;
+          instrumentManager.setVolume(name, MIN_DB);
+        });
+        setVolumes(muted);
+        setMasterVolume(0);
+      } else {
+        // Resuming: restore volumes
+        const restored = savedVolumesRef.current || volumes;
+        Object.entries(restored).forEach(([name, value]) => {
+          instrumentManager.setVolume(name, value);
+        });
+        setVolumes(restored);
+      }
+
+      setIsPlaying(newPlayState);
+    }
+
+    playToggleRef.current = playToggleNow;
+
+    // 🔊 Update volume from motion tracking
+    if (typeof data.volume === "number" && isPlayingRef.current) {
+      const dbValue = MIN_DB + data.volume * (MAX_DB - MIN_DB);
+      const normalized = Math.round(1 + data.volume * 99);
+      setMasterVolume(normalized);
+
+      setVolumes((prev) => ({
+        ...prev,
+        keyboard: dbValue,
+        guitar: dbValue,
+        bass: dbValue,
+        percussion: dbValue,
+      }));
+
+      ["keyboard", "guitar", "bass", "percussion"].forEach((name) => {
+        instrumentManager.setVolume(name, dbValue);
+      });
+    }
+
+    
+    // Handle shuffle gesture (rock sign)
+    if (data.shuffle_triggered && !lastShuffleState && !shuffleCooldown) {
+      // Shuffle to next theme
+      const currentIndex = themes.indexOf(currentTheme);
+      const nextIndex = (currentIndex + 1) % themes.length;
+      const nextTheme = themes[nextIndex];
+      console.log(`🤘 Rock gesture detected! Shuffling from ${currentTheme} to ${nextTheme}`);
+      handleThemeChange(nextTheme);
+      
+      // Set cooldown period
+      setShuffleCooldown(true);
+      setTimeout(() => {
+        setShuffleCooldown(false);
+        console.log('Shuffle cooldown ended');
+      }, 2000); // 2 second cooldown
+    }
+    setLastShuffleState(data.shuffle_triggered || false);
     
     // Update app state from motion tracking
     if (data.current_instrument !== null && data.current_instrument !== currentInstrument) {
@@ -106,22 +196,14 @@ function App() {
     }));
   };
 
-
-// Simulate incoming sensor data
-// Sync instruments to BPM
-<FitbitConnector onBpmChange={setBpm} />
-{/* Motion-tracked camera with gesture controls */}
-<CameraFeed onMotionData={handleMotionData} />
-
-useEffect(() => {
+  useEffect(() => {
     console.log(`BPM updated to: ${bpm}`);
     instrumentManager.setTempo(bpm);
-}, [bpm]);
+  }, [bpm]);
 
   // Load all instruments on mount
   useEffect(() => {
     const instruments = ["keyboard", "guitar", "bass", "percussion"];
-    const themes = ["jazz", "chill", "rock", "house"];
     themes.forEach((theme) => {
       instruments.forEach((inst) => {
         instrumentManager.loadInstrument(
@@ -132,6 +214,25 @@ useEffect(() => {
     });
   }, []);
 
+  // Handle theme change
+  const handleThemeChange = (theme) => {
+    console.log(`Changing theme from ${currentTheme} to ${theme}`);
+    
+    // Store which instruments are currently playing
+    const currentlyPlaying = Object.keys(playingInstruments).filter(
+      inst => playingInstruments[inst]
+    );
+    
+    // Change theme immediately
+    setCurrentTheme(theme);
+    instrumentManager.setTheme(theme);
+    
+    // Restart the instruments that were playing instantly (no delay)
+    currentlyPlaying.forEach(inst => {
+      instrumentManager.toggle(inst);
+    });
+  };
+
   // Handle volume change
   const handleVolumeChange = (name, value) => {
     setVolumes((prev) => ({ ...prev, [name]: value }));
@@ -139,82 +240,162 @@ useEffect(() => {
   };
 
 return (
-  <div className="App"> {/* Start of App div */}
-<div style={{ textAlign: "center" }}>
-  <h1 style={{ color: "pink", fontFamily: "Barriecito" }}>
-  </h1>
-  <img 
-    src={heartlogo} 
-    alt="Heart Jam Logo" 
-    style={{ width: "450px", marginTop: "10px" }} 
-  />
-
-      {/* 🌈 THEME BUTTONS ADDED HERE */}
-      <div style={{ marginBottom: "20px" }}>
-        <button onClick={() => instrumentManager.setTheme("jazz")}>Jazz</button>
-        <button onClick={() => instrumentManager.setTheme("house")}>House</button>
-        <button onClick={() => instrumentManager.setTheme("chill")}>Chill</button>
-        <button onClick={() => instrumentManager.setTheme("rock")}>Rock</button>
-      </div>
-      <FitbitConnector onBpmChange={setBpm} />
+  <div className="App">
+    {/* Header */}
+    <div style={{ textAlign: "center", marginBottom: "20px" }}>
+      <img 
+        src={heartlogo} 
+        alt="Heart Jam Logo" 
+        style={{ width: "450px", marginTop: "5px" }} 
+      />
       
-      <CameraFeed onMotionData={handleMotionData} />
+      {/* Theme Buttons
+      <div style={{ marginTop: "15px", marginBottom: "10px" }}>
+        <button 
+          onClick={() => handleThemeChange("jazz")}
+          style={{ fontWeight: currentTheme === "jazz" ? "bold" : "normal" }}
+        >
+          Jazz
+        </button>
+        <button 
+          onClick={() => handleThemeChange("house")}
+          style={{ fontWeight: currentTheme === "house" ? "bold" : "normal" }}
+        >
+          House
+        </button>
+        <button 
+          onClick={() => handleThemeChange("chill")}
+          style={{ fontWeight: currentTheme === "chill" ? "bold" : "normal" }}
+        >
+          Chill
+        </button>
+        <button 
+          onClick={() => handleThemeChange("rock")}
+          style={{ fontWeight: currentTheme === "rock" ? "bold" : "normal" }}
+        >
+          Rock
+        </button>
+      </div> */}
+      
+      <FitbitConnector onBpmChange={setBpm} />
+    </div>
 
-      <div className="instruments-container" style={{ display: "flex", flexDirection: "row", justifyContent: "center", gap: "20px", marginTop: "20px" }}>
-    <Instrument 
-      imgSrc={blueheart} 
-      alt="blue heart" 
-      onClick={() => toggleInstrument('keyboard')} 
-      isPlaying={playingInstruments.keyboard}
-      beat={globalBeat}
-      instrumentName="Keyboard"
-    />
-    <Instrument 
-      imgSrc={yellowheart} 
-      alt="yellow heart" 
-      onClick={() => toggleInstrument('guitar')} 
-      isPlaying={playingInstruments.guitar}
-      beat={globalBeat}
-      instrumentName="Guitar"
-    />
-    <Instrument 
-      imgSrc={greenheart} 
-      alt="percussion" 
-      onClick={() => toggleInstrument('percussion')} 
-      isPlaying={playingInstruments.percussion}
-      beat={globalBeat}
-      instrumentName="Percussion"
-    />
-    <Instrument 
-      imgSrc={purpleheart} 
-      alt="bass" 
-      onClick={() => toggleInstrument('bass')} 
-      isPlaying={playingInstruments.bass}
-      beat={globalBeat}
-      instrumentName="Bass"
-    />
-  </div>
+    {/* Bottom Right Text */}
+    <div
+      className="pixelify-sans"
+      style={{
+      fontSize: "48px",
+      marginTop: "40px",
+      textAlign: "left",
+      lineHeight: "1.2",
+      paddingLeft: "130px",
+      paddingBottom: "18px",
+    }}
+    >
+      Listen to your heart...
+    </div>
 
-    {/* <Heart bpm={bpm} /> */}
-   
-      {/* Volume control */}
-      {["keyboard", "guitar", "percussion", "bass"].map((inst) => (
-        <div key={inst} style={{ marginTop: "15px", display: "flex", alignItems: "center" }}>
-          <span style={{ width: "40px", textTransform: "capitalize" }}>{inst}</span>
-          <input
-            type="range"
-            min={-60}
-           max={6}
-            value={volumes[inst]}
-            onChange={(e) =>
-              handleVolumeChange(inst, parseFloat(e.target.value))
-            }
-            style={{ marginLeft: "10px", width: "200px" }}
+    {/* Main Content - Two Column Layout */}
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "0 10px", gap: "0px", maxWidth: "1400px", margin: "0 auto" }}>
+      
+      {/* Left Side - Camera and Hearts */}
+      <div style={{ flex: "1", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+        <CameraFeed onMotionData={handleMotionData} />
+        
+        {/* Pixel Hearts */}
+        <div className="instruments-container" style={{ display: "flex", flexDirection: "row", justifyContent: "center", gap: "20px" }}>
+          <Instrument 
+            imgSrc={blueheart} 
+            alt="blue heart" 
+            onClick={() => toggleInstrument('keyboard')} 
+            isPlaying={playingInstruments.keyboard}
+            beat={globalBeat}
+            instrumentName="Keyboard"
+          />
+          <Instrument 
+            imgSrc={yellowheart} 
+            alt="yellow heart" 
+            onClick={() => toggleInstrument('guitar')} 
+            isPlaying={playingInstruments.guitar}
+            beat={globalBeat}
+            instrumentName="Guitar"
+          />
+          <Instrument 
+            imgSrc={greenheart} 
+            alt="percussion" 
+            onClick={() => toggleInstrument('percussion')} 
+            isPlaying={playingInstruments.percussion}
+            beat={globalBeat}
+            instrumentName="Percussion"
+          />
+          <Instrument 
+            imgSrc={purpleheart} 
+            alt="bass" 
+            onClick={() => toggleInstrument('bass')} 
+            isPlaying={playingInstruments.bass}
+            beat={globalBeat}
+            instrumentName="Bass"
           />
         </div>
-      ))}
+
+        {/* Volume Controls */}
+        <div style={{ width: "100%", maxWidth: "400px", position: "relative" }}>
+          {["keyboard", "guitar", "percussion", "bass"].map((inst) => (
+            <div key={inst} style={{ marginTop: "15px", display: "flex", alignItems: "center" }}>
+              <span style={{ width: "100px", textTransform: "capitalize" }}>{inst}</span>
+              <input
+                type="range"
+                min={-60}
+                max={6}
+                value={volumes[inst]}
+                onChange={(e) =>
+                  handleVolumeChange(inst, parseFloat(e.target.value))
+                }
+                style={{ marginLeft: "10px", width: "200px" }}
+              />
+            </div>
+          ))}
+  
+        </div>
+      </div>
+
+      {/* Right Side - Guidelines */}
+      <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", paddingRight: "120px", gap: "15px" }}>
+        {/* Current Theme Display */}
+        <div 
+          className="pixelify-sans"
+          style={{
+            background: currentTheme === "jazz" ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" :
+                        currentTheme === "house" ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)" :
+                        currentTheme === "chill" ? "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" :
+                        "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+            padding: "15px 30px",
+            borderRadius: "20px",
+            fontSize: "28px",
+            fontWeight: "bold",
+            color: "white",
+            textShadow: "2px 2px 4px rgba(0,0,0,0.3)",
+            boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+            textTransform: "uppercase",
+            letterSpacing: "2px",
+            animation: "pulse 2s ease-in-out infinite",
+          }}
+        >
+          🎵 {currentTheme} Vibes 🎵
+        </div>
+        
+        <img
+          src={guideline}
+          alt="guideline"
+          style={{
+            width: "500px",
+            height: "auto",
+            display: "block",
+          }}
+        />
+      </div>
     </div>
-    </div>
+  </div>
   );
 }
 export default App;

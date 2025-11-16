@@ -53,6 +53,20 @@ def process_single_frame(frame):
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
     h, w, _ = frame.shape
+
+    # Make sure these attrs exist (they *are* in MotionEngine.__init__, but safe)
+    if not hasattr(motion_engine, "current_volume"):
+        motion_engine.current_volume = 0.0
+    if not hasattr(motion_engine, "is_playing"):
+        motion_engine.is_playing = True
+    if not hasattr(motion_engine, "prev_two_fists"):
+        motion_engine.prev_two_fists = False
+    if not hasattr(motion_engine, "current_instrument"):
+        motion_engine.current_instrument = None
+    if not hasattr(motion_engine, "pending_instrument"):
+        motion_engine.pending_instrument = None
+    if not hasattr(motion_engine, "prev_rock_any"):
+        motion_engine.prev_rock_any = False
     
     # Process hands
     hands_results = motion_engine.hands.process(frame_rgb)
@@ -64,7 +78,17 @@ def process_single_frame(frame):
         'current_instrument': getattr(motion_engine, 'current_instrument', None),
         'prev_rock_any': motion_engine.prev_rock_any,
         'prev_two_fists': motion_engine.prev_two_fists,
+        'pointer': None,
+        'volume': motion_engine.current_volume,
+        'play_toggle': False,
+        'playing': bool(motion_engine.is_playing),
+        'shuffle_triggered': False,
     }
+
+    fist_count = 0
+    rock_now = False
+    left_wrist_y = None
+    right_wrist_y = None
     
     # Extract hand landmarks and gestures
     if hands_results.multi_hand_landmarks:
@@ -88,12 +112,33 @@ def process_single_frame(frame):
             is_fist_gesture = is_fist(hand_landmarks)
             is_rock = is_rock_sign(hand_landmarks)
             
+            # Track rock gesture for shuffle
+            if is_rock:
+                rock_now = True
+            
+            # Track fists for play/pause
+            if is_fist_gesture:
+                fist_count += 1
+            
+            if finger_count == 1: # newest ver.
+                index_tip = hand_landmarks.landmark[8]
+                ny = float(index_tip.y)
+
+                motion_engine.current_volume = 1.0 - ny
+
+                response['pointer'] = {
+                    'x': float(index_tip.x),
+                    'y': float(index_tip.y),
+                    'hand': hand_label,
+                }
+            
+            
             # Update pending selections based on hand
-            if hand_label == "Left" and 4>= finger_count > 0:
+            if hand_label == "Right" and 4>= finger_count > 0:
                 motion_engine.pending_instrument = finger_count
             
             # Confirm with OK gesture (right hand confirms left hand instrument selection)
-            if hand_label == "Right" and is_ok:
+            if hand_label == "Left" and is_ok:
                 if motion_engine.pending_instrument is not None:
                     motion_engine.current_instrument = motion_engine.pending_instrument
             
@@ -102,6 +147,23 @@ def process_single_frame(frame):
                 index_tip = hand_landmarks.landmark[8]
                 ny = float(index_tip.y)
                 motion_engine.current_pitch = 1.0 - ny
+                
+                # Store pointer position for trail
+                response['pointer'] = {
+                    'x': float(index_tip.x),
+                    'y': float(index_tip.y)
+                }
+            
+            # Play/Pause toggle: detect two fists
+            two_fists_now = (fist_count >= 2)
+            two_fists_pulse = two_fists_now and not motion_engine.prev_two_fists
+            if two_fists_pulse:
+                # Rising edge - toggle play state
+                motion_engine.is_playing = not motion_engine.is_playing
+            
+            response['play_toggle'] = two_fists_pulse
+            response['playing'] = bool(motion_engine.is_playing)
+            motion_engine.prev_two_fists = two_fists_now
             
             response['hands'].append({
                 'label': hand_label,
@@ -114,10 +176,23 @@ def process_single_frame(frame):
                     'rock': is_rock,
                 }
             })
+            response['volume'] = float(motion_engine.current_volume)
+            
     else:
         # No hands detected - reset pending and current instrument
         motion_engine.pending_instrument = None
         motion_engine.current_instrument = None
+    
+
+    
+    # Shuffle trigger: detect rock gesture (rising edge)
+    if rock_now and not motion_engine.prev_rock_any:
+        # Rising edge - trigger shuffle
+        response['shuffle_triggered'] = True
+    motion_engine.prev_rock_any = rock_now
+    
+    response['volume'] = motion_engine.current_volume
+    response['playing'] = motion_engine.is_playing
     
     # Process face for expression/key mode
     # if face_results.multi_face_landmarks:
