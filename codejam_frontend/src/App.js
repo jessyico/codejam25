@@ -1,152 +1,141 @@
-import { useState, useEffect } from 'react';
-import './App.css';
-import { closestCorners, DndContext } from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
-import CameraFeed from './components/CameraFeed';
-import Heart from './components/Heart';
-import { Column } from './components/Column';
-import catpianoGif from "./assets/piano.png";
-import catguitarGif from "./assets/pixelguitar.png";
-import drumGif from "./assets/pixeldrums.png";
-import bassGif from "./assets/pixelbass.png";
-import saxoGif from "./assets/saxophone.png";
-import logo from "./assets/heartjamlogo.png";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useState, useEffect } from "react";
+import "./App.css";
 
-import React from 'react';
+import Heart from "./components/Heart";
+import Instrument from "./components/Instrument";
+import blueheart from "./assets/blue_heart.webp";
+import yellowheart from "./assets/yellow_heart.webp";
+import greenheart from "./assets/green_heart.webp";
+import purpleheart from "./assets/purple_heart.webp";
+import heartlogo from "./assets/heartjamlogo.png";
+import FitbitConnector from "./components/FitbitConnect";
+import drums from "./assets/drums_new.png";
+import bass_new from "./assets/bass_new.png";
+import guitar_new from "./assets/guitar_new.png";
+import piano_new from "./assets/piano_new.png";
+import CameraFeed from "./components/HandGestureCamera";
+// import instrumentManager.js
+import instrumentManager from "./audio/instrumentManager.js";
 
 function App() {
-  const [bpm, setBpm] = useState(80);
-  const [Instruments, setInstruments] = useState([
-    { id: 1, title: 'Piano', imgSrc: catpianoGif, alt: 'Funny cat piano' },
-    { id: 2, title: 'Saxophone', imgSrc: saxoGif, alt: 'Saxophone' },
-    { id: 3, title: 'Guitar', imgSrc: catguitarGif, alt: 'Funny cat guitar' },
-    { id: 4, title: 'Drums', imgSrc: drumGif, alt: 'Fire drums' },
-    { id: 5, title: 'Bass', imgSrc: bassGif, alt: 'Bass' },
-  ]);
-  const [BottomInstruments, setBottomInstruments] = useState([]);
+  const [bpm, setBpm] = useState(80); // default BPM
+  const [volumes, setVolumes] = useState({
+    keyboard: 0,
+    guitar: 0,
+    bass: 0,
+    percussion: 0,
+  });
+  const [motionData, setMotionData] = useState(null);
+  const [currentTrack, setCurrentTrack] = useState(null);
 
-  // Helper to find index in an array
-  const getIndex = (arr, id) => arr.findIndex(item => item.id === id);
+  // Handle motion data from camera
+  const handleMotionData = (data) => {
+    setMotionData(data);
+    // Update app state from motion tracking
+    if (data.current_instrument !== null) setCurrentInstrument(data.current_instrument);
+    
+  };
 
-  const handleDragEnd = ({ active, over }) => {
-    if (!over) return;
-    if (active.id === over.id) return; // No move
-  
-    // Determine source array and setSource
-    let sourceArray, setSource;
-    if (getIndex(Instruments, active.id) !== -1) {
-      sourceArray = Instruments;
-      setSource = setInstruments;
-    } else {
-      sourceArray = BottomInstruments;
-      setSource = setBottomInstruments;
-    }
-  
-    // Determine destination array and setDest
-    let destArray, setDest;
-    if (over.id.toString().startsWith('empty')) {
-      // Dropped on empty slot
-      const [, colId] = over.id.toString().split('-');
-      if (colId === 'bottom') {
-        destArray = BottomInstruments;
-        setDest = setBottomInstruments;
-      } else if (colId === 'top') {
-        destArray = Instruments;
-        setDest = setInstruments;
-      } else {
-        return;
-      }
-    } else {
-      // Dropped on an instrument
-      if (getIndex(Instruments, over.id) !== -1) {
-        destArray = Instruments;
-        setDest = setInstruments;
-      } else if (getIndex(BottomInstruments, over.id) !== -1) {
-        destArray = BottomInstruments;
-        setDest = setBottomInstruments;
-      } else {
-        return;
-      }
-    }
-  
-    // Get indices
-    const oldIndex = getIndex(sourceArray, active.id);
-    let newIndex;
-    if (over.id.toString().startsWith('empty')) {
-      // For empty slots, use the index from the id (e.g., empty-bottom-0)
-      newIndex = parseInt(over.id.toString().split('-')[2]);
-    } else {
-      newIndex = getIndex(destArray, over.id);
-    }
-  
-    // Move the item
-    const item = sourceArray[oldIndex];
-    setSource(prev => prev.filter(i => i.id !== active.id));
-    setDest(prev => {
-      const copy = [...prev];
-      copy.splice(newIndex, 0, item);
-      return copy;
-    });
-  };  
 
+
+
+// Simulate incoming sensor data
+// Sync instruments to BPM
+<FitbitConnector onBpmChange={setBpm} />
+{/* Motion-tracked camera with gesture controls */}
+<CameraFeed onMotionData={handleMotionData} />
+
+useEffect(() => {
+    console.log(`BPM updated to: ${bpm}`);
+    instrumentManager.setTempo(bpm);
+}, [bpm]);
+
+  // Load all instruments on mount
   useEffect(() => {
-    const interval = setInterval(() => {
-      setBpm(60 + Math.floor(Math.random() * 40));
-    }, 2000);
-    return () => clearInterval(interval);
+    const instruments = ["keyboard", "guitar", "bass", "percussion"];
+    const themes = ["jazz", "chill", "rock", "house"];
+    themes.forEach((theme) => {
+      instruments.forEach((inst) => {
+        instrumentManager.loadInstrument(
+          `${theme}_${inst}`, // unique ID
+          `/assets/${theme}/${theme}_${inst}.mp3` // correct file path
+        );
+      });
+    });
   }, []);
 
-  return (
-    <div>
-     <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
-  <img src={logo} alt="HeartJam Logo" style={{ width: "500px" }} />
+  // Handle volume change
+  const handleVolumeChange = (name, value) => {
+    setVolumes((prev) => ({ ...prev, [name]: value }));
+    instrumentManager.setVolume(name, value);
+  };
+
+return (
+  <div className="App"> {/* Start of App div */}
+<div style={{ textAlign: "center" }}>
+  <h1 style={{ color: "pink", fontFamily: "Barriecito" }}>
+    
+  </h1>
+  <img 
+    src={heartlogo} 
+    alt="Heart Jam Logo" 
+    style={{ width: "400px", height: "150px", marginTop: "10px" }} 
+  />
+
+      {/* 🌈 THEME BUTTONS ADDED HERE */}
+      <div style={{ marginBottom: "20px" }}>
+        <button onClick={() => instrumentManager.setTheme("jazz")}>Jazz</button>
+        <button onClick={() => instrumentManager.setTheme("house")}>House</button>
+        <button onClick={() => instrumentManager.setTheme("chill")}>Chill</button>
+        <button onClick={() => instrumentManager.setTheme("rock")}>Rock</button>
+      </div>
+      <FitbitConnector onBpmChange={setBpm} />
+      
+      <CameraFeed />
+
+      <div className="instruments-container" style={{ display: "flex", justifyContent: "flex-start", gap: "10px",paddingLeft: "200px" }}>
+  {/* Left column */}
+  <div className="column" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+    <Instrument imgSrc={blueheart} alt="blue heart" onClick={() => instrumentManager.toggle('keyboard')} />
+    <Instrument imgSrc={yellowheart} alt="yellow heart" onClick={() => instrumentManager.toggle('guitar')} />
+    <Instrument imgSrc={greenheart} alt="percussion" onClick={() => instrumentManager.toggle('percussion')} />
+    <Instrument imgSrc={purpleheart} alt="bass" onClick={() => instrumentManager.toggle('bass')} />
+  </div>
+
+  {/* Right column */}
+  <div className="column" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+    <Instrument imgSrc={piano_new} alt="piano icon" 
+    style={{ height: "80px", width: "auto" }} 
+    />
+    <Instrument imgSrc={guitar_new} alt="guitar icon"
+    style={{ height: "5px", width: "auto" }}  />
+    <Instrument imgSrc={drums} alt="drums icon"
+    style={{ height: "80px", width: "auto" }}  />
+    <Instrument imgSrc={bass_new} alt="bass icon"
+    style={{ height: "80px", width: "auto" }}  />
+  </div>
 </div>
 
-     { <h1>Listen to your heart</h1>}
-     <DndContext
-  collisionDetection={closestCorners}
-  onDragEnd={handleDragEnd}
->
-  <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
-    {/* LEFT: Camera */}
-    <div style={{ flex: 1 }}>
-    { <CameraFeed />}
-    
-      <p>Current BPM: {bpm}</p>
-      <Heart bpm={bpm} />
-      {/* RIGHT: Two columns */}
-      <div style={{
-        display: "flex",
-        flexDirection: "row",
-        width: "100%",
-        gap: "20px",
-        justifyContent: "space-between",
-        alignItems: "flex-start"
-      }}>
-        <SortableContext
-          items={[...Instruments, ...BottomInstruments].map(i => i.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {/* First column centered 
-          <div style={{ margin: "0 auto" }}>
-            <Column id="bottom" Instruments={BottomInstruments} maxSlots={5} />
-          </div>
-          */}
-          {/* Second column right-aligned */}
-          <div style={{ margin: "0 auto" }}>
-            <Column id="top" Instruments={Instruments} maxSlots={5} />
-          </div>
-        </SortableContext>
-      </div>
+    <Heart bpm={bpm} />
+   
+      {/* Volume control */}
+      {["keyboard", "guitar", "percussion", "bass"].map((inst) => (
+        <div key={inst} style={{ marginTop: "15px", display: "flex", alignItems: "center" }}>
+          <span style={{ width: "40px", textTransform: "capitalize" }}>{inst}</span>
+          <input
+            type="range"
+            min={-60}
+           max={6}
+            value={volumes[inst]}
+            onChange={(e) =>
+              handleVolumeChange(inst, parseFloat(e.target.value))
+            }
+            style={{ marginLeft: "10px", width: "200px" }}
+          />
+        </div>
+      ))}
     </div>
-  </div>
-</DndContext>
-
-
-     
     </div>
   );
 }
-
 export default App;

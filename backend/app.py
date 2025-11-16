@@ -89,7 +89,7 @@ def process_single_frame(frame):
             is_rock = is_rock_sign(hand_landmarks)
             
             # Update pending selections based on hand
-            if hand_label == "Left" and 4 >= finger_count > 0:
+            if hand_label == "Left" and 4>= finger_count > 0:
                 motion_engine.pending_instrument = finger_count
             
             # Confirm with OK gesture (right hand confirms left hand instrument selection)

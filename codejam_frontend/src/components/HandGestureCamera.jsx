@@ -44,7 +44,6 @@ export default function CameraFeed({ onMotionData }) {
 
     const renderLoop = () => {
       if (!isActive) return;
-
       if (video.readyState >= video.HAVE_CURRENT_DATA) {
         // Set canvas size on first frame
         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {

@@ -12,7 +12,7 @@
 .connect-sensor-btn:hover {
   background: rgb(241, 139, 156);
 }
-
+/*comment*/
 .connect-sensor-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
