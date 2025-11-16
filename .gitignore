@@ -1,0 +1,10 @@
+# Python virtual environments
+.venv/
+venv/
+
+# Node/npm
+package.json
+package-lock.json
+node_modules/
+
+__pycache__

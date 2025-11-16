@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700;900&display=swap');
+.pixelify-sans {
+  font-family: "Pixelify Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+}
+
+.App {
+  text-align: center;
+  font-family: "Inconsolata", monospace;
+  background-color: #d9eff7e4; /* light grey */
+  min-height: 100vh; /* make it fill the screen vertically */
+  padding: 0;
+  margin: 0;
+}
+
+.App img {
+  margin-top: 0;
+}
+
+.App h1 {
+  margin-top: 0;
+  padding-top: 2px;
+}
+
+.instrument-container {
+  width: 100%;
+  height: 80vh; /* area for dragging */
+  position: relative; /* required for Draggable bounds */
+  background-color: #f5f5f5;
+  margin: 20px 0;
+  border: 2px solid pink;
+}
+.pixel_font {
+  font-family: "Bitcount Grid Single", sans-serif;
+  font-weight: 700;
+  color: pink;
+  font-size: 48px;
+}
+.pixelify-sans {
+  font-family: "Pixelify Sans", sans-serif;
+  font-weight: 400; /* or 700 for bold */
+  font-style: normal;
+  font-optical-sizing: auto;
+}
+.pixel-mouse {
+  width: 64px; /* or whatever pixel size you like */
+  image-rendering: pixelated; /* keeps it blocky */
+  transition: transform 0.3s ease-in-out;
+}
+
+.pixel-mouse:hover {
+  transform: translateY(-10px); /* hover effect */
+}
+
+
+

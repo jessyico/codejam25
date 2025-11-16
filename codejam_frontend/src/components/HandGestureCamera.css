@@ -1,0 +1,14 @@
+.camera-container {
+  max-width: 640px;
+  margin: 20px auto;
+  position: relative;
+}
+
+.camera-video {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: scaleX(-1); /* Mirror for natural camera feel */
+}
