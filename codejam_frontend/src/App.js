@@ -1,154 +1,125 @@
-import { useState, useEffect } from 'react';
-import './App.css';
-import { closestCorners, DndContext } from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
-import CameraFeed from './components/CameraFeed';
-import Heart from './components/Heart';
-import { Column } from './components/Column';
-import catpianoGif from "./assets/piano.png";
-import catguitarGif from "./assets/pixelguitar.png";
-import drumGif from "./assets/pixeldrums.png";
-import bassGif from "./assets/pixelbass.png";
-import saxoGif from "./assets/saxophone.png";
-import logo from "./assets/heartjamlogo.png";
+import { useState, useEffect } from "react";
+import "./App.css";
+import CameraFeed from "./components/CameraFeed";
+import Heart from "./components/Heart";
+import Instrument from "./components/Instrument";
+import blueheart from "./assets/blue_heart.webp";
+import yellowheart from "./assets/yellow_heart.webp";
+import greenheart from "./assets/green_heart.webp";
+import purpleheart from "./assets/purple_heart.webp";
+import heartlogo from "./assets/heartjamlogo.png";
 import FitbitConnector from "./components/FitbitConnect";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-
-import React from 'react';
+// import instrumentManager.js
+import instrumentManager from "./audio/instrumentManager.js";
 
 function App() {
-  const [bpm, setBpm] = useState(80);
-  const [Instruments, setInstruments] = useState([
-    { id: 1, title: 'Piano', imgSrc: catpianoGif, alt: 'Funny cat piano' },
-    { id: 2, title: 'Saxophone', imgSrc: saxoGif, alt: 'Saxophone' },
-    { id: 3, title: 'Guitar', imgSrc: catguitarGif, alt: 'Funny cat guitar' },
-    { id: 4, title: 'Drums', imgSrc: drumGif, alt: 'Fire drums' },
-    { id: 5, title: 'Bass', imgSrc: bassGif, alt: 'Bass' },
-  ]);
-  const [BottomInstruments, setBottomInstruments] = useState([]);
+  const [bpm, setBpm] = useState(80); // default BPM
+  const [volumes, setVolumes] = useState({
+    keyboard: 0,
+    guitar: 0,
+    bass: 0,
+    percussion: 0,
+  });
+// Simulate incoming sensor data
+// Sync instruments to BPM
+<FitbitConnector onBpmChange={setBpm} />
 
-  // Helper to find index in an array
-  const getIndex = (arr, id) => arr.findIndex(item => item.id === id);
+useEffect(() => {
 
-  const handleDragEnd = ({ active, over }) => {
-    if (!over) return;
-    if (active.id === over.id) return; // No move
-  
-    // Determine source array and setSource
-    let sourceArray, setSource;
-    if (getIndex(Instruments, active.id) !== -1) {
-      sourceArray = Instruments;
-      setSource = setInstruments;
-    } else {
-      sourceArray = BottomInstruments;
-      setSource = setBottomInstruments;
-    }
-  
-    // Determine destination array and setDest
-    let destArray, setDest;
-    if (over.id.toString().startsWith('empty')) {
-      // Dropped on empty slot
-      const [, colId] = over.id.toString().split('-');
-      if (colId === 'bottom') {
-        destArray = BottomInstruments;
-        setDest = setBottomInstruments;
-      } else if (colId === 'top') {
-        destArray = Instruments;
-        setDest = setInstruments;
-      } else {
-        return;
-      }
-    } else {
-      // Dropped on an instrument
-      if (getIndex(Instruments, over.id) !== -1) {
-        destArray = Instruments;
-        setDest = setInstruments;
-      } else if (getIndex(BottomInstruments, over.id) !== -1) {
-        destArray = BottomInstruments;
-        setDest = setBottomInstruments;
-      } else {
-        return;
-      }
-    }
-  
-    // Get indices
-    const oldIndex = getIndex(sourceArray, active.id);
-    let newIndex;
-    if (over.id.toString().startsWith('empty')) {
-      // For empty slots, use the index from the id (e.g., empty-bottom-0)
-      newIndex = parseInt(over.id.toString().split('-')[2]);
-    } else {
-      newIndex = getIndex(destArray, over.id);
-    }
-  
-    // Move the item
-    const item = sourceArray[oldIndex];
-    setSource(prev => prev.filter(i => i.id !== active.id));
-    setDest(prev => {
-      const copy = [...prev];
-      copy.splice(newIndex, 0, item);
-      return copy;
-    });
-  };  
+    console.log(`BPM updated to: ${bpm}`);
+    instrumentManager.setTempo(bpm);
+ 
+}, [bpm]);
 
+  // Load all instruments on mount
   useEffect(() => {
-    const interval = setInterval(() => {
-      setBpm(60 + Math.floor(Math.random() * 40));
-    }, 2000);
-    return () => clearInterval(interval);
+    const instruments = ["keyboard", "guitar", "bass", "percussion"];
+    const themes = ["jazz", "chill", "rock", "house"];
+
+    themes.forEach((theme) => {
+      instruments.forEach((inst) => {
+        instrumentManager.loadInstrument(
+          `${theme}_${inst}`, // unique ID
+          `/assets/${theme}/${theme}_${inst}.mp3` // correct file path
+        );
+      });
+    });
   }, []);
 
-  return (
+  // Handle volume change
+  const handleVolumeChange = (name, value) => {
+    setVolumes((prev) => ({ ...prev, [name]: value }));
+    instrumentManager.setVolume(name, value);
+  };
+
+return (
     <div>
-     <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
-  <img src={logo} alt="HeartJam Logo" style={{ width: "500px" }} />
-  <FitbitConnector onBpmChange={setBpm} />
-</div>
-
-     {/*} <h1 className="pixelify-sans">Listen to your heart</h1>*/}
-     <DndContext
-  collisionDetection={closestCorners}
-  onDragEnd={handleDragEnd}
->
-  <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
-    {/* LEFT: Camera */}
-    <div style={{ flex: 1 }}>
-    { /*  <CameraFeed /> */}
-    <CameraFeed />
-      
-    
-      <p>Current BPM: {bpm}</p>
-      <Heart bpm={bpm} />
-      {/* RIGHT: Two columns */}
-      <div style={{
-        display: "flex",
-        flexDirection: "row",
-        width: "100%",
-        gap: "20px",
-        justifyContent: "space-between",
-        alignItems: "flex-start"
-      }}>
-        <SortableContext
-          items={[...Instruments, ...BottomInstruments].map(i => i.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {/* First column centered 
-          <div style={{ margin: "0 auto" }}>
-            <Column id="bottom" Instruments={BottomInstruments} maxSlots={5} />
-          </div>
-          */}
-          {/* Second column right-aligned */}
-          <div style={{ marginLeft: "auto" }}>
-            <Column id="top" Instruments={Instruments} maxSlots={5} />
-          </div>
-        </SortableContext>
+      <h1 style={{ color: "pink", fontFamily: "Barriecito" }}>
+        Listen to your heart
+      </h1>
+      {/* 🌈 THEME BUTTONS ADDED HERE */}
+      <div style={{ marginBottom: "20px" }}>
+        <button onClick={() => instrumentManager.setTheme("jazz")}>Jazz</button>
+        <button onClick={() => instrumentManager.setTheme("house")}>House</button>
+        <button onClick={() => instrumentManager.setTheme("chill")}>Chill</button>
+        <button onClick={() => instrumentManager.setTheme("rock")}>Rock</button>
       </div>
-    </div>
-  </div>
-</DndContext>
+      
+      <FitbitConnector onBpmChange={setBpm} />
+      
 
 
-     
+      <div className="instruments-container">
+        <Instrument
+          imgSrc={blueheart}
+          alt="blue heart"
+          onClick={() => {
+          instrumentManager.toggle('keyboard'); // template literal
+          }}
+        />
+        <Instrument
+          imgSrc={yellowheart}
+          alt="yellow heart"
+          onClick={() => {
+          instrumentManager.toggle('guitar'); // template literal
+          }}
+        />
+        <Instrument 
+          imgSrc={greenheart} 
+          alt="green heart" 
+          onClick={() => {
+          instrumentManager.toggle('percussion'); // template literal
+          }}
+        />
+        <Instrument
+          imgSrc={purpleheart}
+          alt="purple heart"
+          onClick={() => {
+          instrumentManager.toggle('bass'); // template literal
+          }}
+        />
+      </div>
+<p>Current BPM: {bpm}</p>
+<p>Current BPM: {bpm}</p>
+      <CameraFeed />
+    <Heart bpm={bpm} />
+
+      {/* Volume control */}
+      {["keyboard", "guitar", "percussion", "bass"].map((inst) => (
+        <div key={inst} style={{ marginTop: "15px", display: "flex", alignItems: "center" }}>
+          <span style={{ width: "40px", textTransform: "capitalize" }}>{inst}</span>
+          <input
+            type="range"
+            min={-60}
+           max={6}
+            value={volumes[inst]}
+            onChange={(e) =>
+              handleVolumeChange(inst, parseFloat(e.target.value))
+            }
+            style={{ marginLeft: "10px", width: "200px" }}
+          />
+        </div>
+      ))}
     </div>
   );
 }

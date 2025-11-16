@@ -4,7 +4,9 @@ class instrumentManager {
         this.instruments = {};
         this.toneLoaded = false;
         this.started = false;
+        this.currentTheme = "jazz";
         this.defaultBpm = 120;
+
     }
 
     // Load Tone.js from CDN if not already loaded
@@ -37,8 +39,23 @@ class instrumentManager {
             player.mute = true;  // start muted
             player.playbackRate = 1;
             this.instruments[name] = player;
+            console.log(`Loading instrument: ${name} from ${url}`);
         }
     }
+
+    async setTheme(theme) {
+        this.currentTheme = theme;
+
+        // Stop all instruments before switching
+        Object.values(this.instruments).forEach((player) => {
+            try {
+                player.stop();
+            } catch {}
+        });
+
+        this.started = false;
+    }
+
 
     // start all instruments in sync
     _startAllOnce() {
@@ -49,17 +66,21 @@ class instrumentManager {
             player.mute = true;  // keep muted until toggled
         });
 
-        this.started = true;
+       this.started = true;
     }
     
     toggle(name) { 
         this._startAllOnce();
 
-        const player = this.instruments[name];
+        const themedName = `${this.currentTheme}_${name}`; // e.g. “jazz_keyboard”
+
+        const player = this.instruments[themedName];
         if (!player) return;
 
         player.mute = !player.mute;
+        console.log(`${name} is now ${player.mute ? "muted" : "unmuted"}`);
     }
+
     
     setTempo(bpm) {
         this.currentBpm = bpm;
@@ -71,7 +92,8 @@ class instrumentManager {
     }
 
     setVolume(name, volume) {
-        const player = this.instruments[name];
+        const themedName = `${this.currentTheme}_${name}`; // e.g. “jazz_keyboard”
+        const player = this.instruments[themedName];
         if (player) player.volume.value = volume;
     }
 }
