@@ -173,32 +173,32 @@ def is_thumb_up(hand_landmarks):
 def euclidean_dist(p1, p2):
     return math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2)
 
-def get_mouth_features(face_landmarks):
-    lm = face_landmarks.landmark
+# def get_mouth_features(face_landmarks):
+#     lm = face_landmarks.landmark
 
-    left_corner  = lm[61]
-    right_corner = lm[291]
-    upper_lip    = lm[13]
-    lower_lip    = lm[14]
+#     left_corner  = lm[61]
+#     right_corner = lm[291]
+#     upper_lip    = lm[13]
+#     lower_lip    = lm[14]
 
-    mouth_width = euclidean_dist(left_corner, right_corner)
-    mouth_height = euclidean_dist(upper_lip, lower_lip)
+#     mouth_width = euclidean_dist(left_corner, right_corner)
+#     mouth_height = euclidean_dist(upper_lip, lower_lip)
 
-    center_y = (upper_lip.y + lower_lip.y) / 2
-    corners_y = (left_corner.y + right_corner.y) / 2
-    curvature = corners_y - center_y
+#     center_y = (upper_lip.y + lower_lip.y) / 2
+#     corners_y = (left_corner.y + right_corner.y) / 2
+#     curvature = corners_y - center_y
 
-    if mouth_width > 1e-6:
-        shape_ratio = mouth_height / mouth_width
-    else:
-        shape_ratio = 0.0
+#     if mouth_width > 1e-6:
+#         shape_ratio = mouth_height / mouth_width
+#     else:
+#         shape_ratio = 0.0
 
-    return {
-        "mouth_width": mouth_width,
-        "mouth_height": mouth_height,
-        "curvature": curvature,
-        "shape_ratio": shape_ratio,
-    }
+#     return {
+#         "mouth_width": mouth_width,
+#         "mouth_height": mouth_height,
+#         "curvature": curvature,
+#         "shape_ratio": shape_ratio,
+#     }
 
 def is_fist(hand_landmarks):
     """
@@ -390,13 +390,13 @@ class MotionEngine:
         )
         self.mp_drawing = mp.solutions.drawing_utils
 
-        self.mp_face_mesh = mp.solutions.face_mesh
-        self.face_mesh = self.mp_face_mesh.FaceMesh(
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5,
-        )
+        # self.mp_face_mesh = mp.solutions.face_mesh
+        # self.face_mesh = self.mp_face_mesh.FaceMesh(
+        #     max_num_faces=1,
+        #     refine_landmarks=True,
+        #     min_detection_confidence=0.5,
+        #     min_tracking_confidence=0.5,
+        # )
 
         self.prev_rock_any = False   # you already have this
         self.prev_two_fists = False   # for fist pulse
@@ -420,37 +420,36 @@ class MotionEngine:
         self.current_pitch = 0.5
         self.current_volume = 0.5
 
-        self.prev_rock_any = False 
 
     
-    def update_neutral_curvature(self, mouth_features,
-                                max_open_height=0.015,
-                                max_abs_curv=0.02,
-                                needed_frames=30):
-        """
-        Learn the user's neutral mouth curvature from early frames:
-        - Only when mouth is not very open
-        - And not a big smile or big frown
-        """
-        if self.neutral_done:
-            return
+    # def update_neutral_curvature(self, mouth_features,
+    #                             max_open_height=0.015,
+    #                             max_abs_curv=0.02,
+    #                             needed_frames=30):
+    #     """
+    #     Learn the user's neutral mouth curvature from early frames:
+    #     - Only when mouth is not very open
+    #     - And not a big smile or big frown
+    #     """
+    #     if self.neutral_done:
+    #         return
 
-        h = mouth_features["mouth_height"]
-        curv = mouth_features["curvature"]
+    #     h = mouth_features["mouth_height"]
+    #     curv = mouth_features["curvature"]
 
-        # Only treat as neutral if mouth is fairly closed & not extreme curvature
-        if h < max_open_height and abs(curv) < max_abs_curv:
-            self.neutral_samples.append(curv)
-            self.neutral_frames += 1
+    #     # Only treat as neutral if mouth is fairly closed & not extreme curvature
+    #     if h < max_open_height and abs(curv) < max_abs_curv:
+    #         self.neutral_samples.append(curv)
+    #         self.neutral_frames += 1
 
-        if self.neutral_frames >= needed_frames:
-            self.neutral_curvature = sum(self.neutral_samples) / len(self.neutral_samples)
-            self.neutral_done = True
-            # Optional: send an event to frontend that calibration is done
-            self.on_event({
-                "type": "expression_calibration",
-                "status": "done"
-            })
+    #     if self.neutral_frames >= needed_frames:
+    #         self.neutral_curvature = sum(self.neutral_samples) / len(self.neutral_samples)
+    #         self.neutral_done = True
+    #         # Optional: send an event to frontend that calibration is done
+    #         self.on_event({
+    #             "type": "expression_calibration",
+    #             "status": "done"
+    #         })
 
     def run(self):
         cap = cv2.VideoCapture(1)
@@ -788,12 +787,12 @@ class MotionEngine:
             
 
             # --- SHOW FRAME + EXIT KEY ---
-            cv2.imshow("Motion Debug", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            # cv2.imshow("Motion Debug", frame)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     break
 
         cap.release()
-        cv2.destroyAllWindows()
+        # cv2.destroyAllWindows()
 
             
 def main():
