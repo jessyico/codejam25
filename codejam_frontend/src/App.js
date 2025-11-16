@@ -181,7 +181,7 @@ return (
       <img 
         src={heartlogo} 
         alt="Heart Jam Logo" 
-        style={{ width: "450px", marginTop: "5px" }} 
+        style={{ width: "500px", marginTop: "5px" }} 
       />
       
       {/* Theme Buttons
@@ -221,9 +221,10 @@ return (
       <div
         className="pixelify-sans"
         style={{
-          fontSize: "48px",
+          fontSize: "40px",
           textAlign: "left",
           lineHeight: "1.2",
+          paddingLeft: "24px",
         }}
       >
         Listen to your heart...
@@ -233,17 +234,16 @@ return (
       <div 
         className="pixelify-sans"
         style={{
-          background: currentTheme === "jazz" ? "linear-gradient(135deg, #556bc3ff 0%, #8352b4ff 100%)" :
-                      currentTheme === "house" ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)" :
-                      currentTheme === "chill" ? "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" :
-                      "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-          padding: "15px 30px",
+          background: currentTheme === "jazz" ? "linear-gradient(135deg, #687dd0ff 0%, #8ca9ebff 100%)" :
+                      currentTheme === "house" ? "linear-gradient(135deg, #ed91b9ff 0%, #e76bb5ff 100%)" :
+                      currentTheme === "chill" ? "linear-gradient(135deg, #58a7ecff 0%, #78c7d7ff 100%)" :
+                      "linear-gradient(135deg, #fd9362ff 0%, #f26969ff 100%)",
+          padding: "15px 20px",
           borderRadius: "20px",
           fontSize: "28px",
           fontWeight: "bold",
           color: "white",
-          textShadow: "2px 2px 4px rgba(0,0,0,0.3)",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+          boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
           textTransform: "uppercase",
           letterSpacing: "2px",
           animation: "pulse 2s ease-in-out infinite",
@@ -296,30 +296,10 @@ return (
             instrumentName="Bass"
           />
         </div>
-
-        {/* Volume Controls */}
-        <div style={{ width: "100%", maxWidth: "400px", position: "relative" }}>
-          {["keyboard", "guitar", "percussion", "bass"].map((inst) => (
-            <div key={inst} style={{ marginTop: "15px", display: "flex", alignItems: "center" }}>
-              <span style={{ width: "100px", textTransform: "capitalize" }}>{inst}</span>
-              <input
-                type="range"
-                min={-60}
-                max={6}
-                value={volumes[inst]}
-                onChange={(e) =>
-                  handleVolumeChange(inst, parseFloat(e.target.value))
-                }
-                style={{ marginLeft: "10px", width: "200px" }}
-              />
-            </div>
-          ))}
-  
-        </div>
       </div>
 
-      {/* Right Side - Guidelines */}
-      <div style={{ flex: "0 0 auto", display: "flex", alignItems: "flex-start", paddingRight: "120px" }}>
+      {/* Right Side - Guidelines and Volume Controls */}
+      <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "flex-start", paddingRight: "120px", gap: "15px" }}>
         <img
           src={guideline}
           alt="guideline"
@@ -329,6 +309,50 @@ return (
             display: "block",
           }}
         />
+        
+        {/* Volume Controls */}
+        <div style={{ width: "350px", paddingTop: "0px", marginLeft: "80px", marginBottom: "40px" }}>
+          <div
+            className="pixelify-sans"
+            style={{
+              fontSize: "30px",
+              textAlign: "center",
+              lineHeight: "1.2",
+              marginBottom: "20px",
+            }}
+          >
+            Volume Controls
+          </div>
+          {["keyboard", "guitar", "percussion", "bass"].map((inst) => (
+            <div key={inst} style={{ marginTop: "15px", display: "flex", alignItems: "center" }}>
+              <span 
+                className="pixelify-sans"
+                style={{ 
+                  width: "100px", 
+                  textTransform: "capitalize", 
+                  fontSize: "18px", 
+                  textAlign: "left" 
+                }}
+              >
+                {inst}
+              </span>
+              <input
+                type="range"
+                min={-60}
+                max={6}
+                value={volumes[inst]}
+                onChange={(e) =>
+                  handleVolumeChange(inst, parseFloat(e.target.value))
+                }
+                style={{ 
+                  flex: "1", 
+                  width: "100%",
+                  accentColor: "#72a6deff"  // Changes slider color to pink
+                }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   </div>

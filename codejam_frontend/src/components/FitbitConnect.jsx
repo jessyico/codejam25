@@ -138,7 +138,7 @@ function FitbitConnector({ onBpmChange }) {
     <div style={{ marginBottom: "1rem" }}>
      <button
         type="button"
-        className="connect-sensor-btn"
+        className="connect-sensor-btn pixelify-sans"
         onClick={handleConnectClick}
         disabled={status === "Fetching..."}
       >
@@ -146,8 +146,8 @@ function FitbitConnector({ onBpmChange }) {
         {status === "Fetching..." && <span className="spinner" />}
       </button>
 
-      <div style={{ marginTop: "0.5rem" }}>
-        <div><strong>Status:</strong> {status}</div>
+      <div style={{ marginTop: "0.5rem", fontSize: "1.15rem" }} className="pixelify-sans">
+        <div style={{ marginBottom: "0.5rem" }}><strong>Status:</strong> {status}</div>
         <div><strong>BPM:</strong> {bpm ?? "--"}</div>
       </div>
 

@@ -7,92 +7,13 @@ export default function CameraFeed({ onMotionData }) {
   const [motionData, setMotionData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const animationFrameRef = useRef(null);
-
-  // Define drawOverlay function before it's used
-  const drawOverlay = (ctx, data, width, height) => {
-    // Save context and flip horizontally to match mirrored display
-    ctx.save();
-    ctx.scale(-1, 1); // Flip horizontally
-    ctx.translate(-width, 0); // Move back into view
-    
-    // Draw hand landmarks
-    if (data.hands && data.hands.length > 0) {
-      data.hands.forEach(hand => {
-        ctx.fillStyle = hand.label === 'Left' ? '#ed78d2ff' : '#61df9cff';
-        ctx.strokeStyle = hand.label === 'Left' ? '#ed78d2ff' : '#61df9cff';
-        ctx.lineWidth = 2;
-
-        // Draw points
-        hand.landmarks.forEach(lm => {
-          // Flip x to match mirrored canvas display
-          const x = (1 - lm.x) * width;
-          const y = lm.y * height;
-          ctx.beginPath();
-          ctx.arc(x, y, 4, 0, 2 * Math.PI);
-          ctx.fill();
-        });
-
-        // Draw hand connections
-        const connections = [
-          [0, 1], [1, 2], [2, 3], [3, 4], // Thumb
-          [0, 5], [5, 6], [6, 7], [7, 8], // Index
-          [0, 9], [9, 10], [10, 11], [11, 12], // Middle
-          [0, 13], [13, 14], [14, 15], [15, 16], // Ring
-          [0, 17], [17, 18], [18, 19], [19, 20], // Pinky
-          [5, 9], [9, 13], [13, 17], // Palm
-        ];
-
-        connections.forEach(([i, j]) => {
-          const p1 = hand.landmarks[i];
-          const p2 = hand.landmarks[j];
-          ctx.beginPath();
-          // Flip x to match mirrored canvas display
-          ctx.moveTo((1 - p1.x) * width, p1.y * height);
-          ctx.lineTo((1 - p2.x) * width, p2.y * height);
-          ctx.stroke();
-        });
-
-        // Draw label
-        const wrist = hand.landmarks[0];
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 16px Arial';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 3;
-        const label = `(${hand.finger_count} fingers)`;
-        // Flip x to match mirrored canvas display
-        ctx.strokeText(label, (1 - wrist.x) * width - 30, wrist.y * height - 10);
-        ctx.fillText(label, (1 - wrist.x) * width - 30, wrist.y * height - 10);
-
-        // Show gestures
-        if (hand.gestures.ok_sign) {
-          ctx.strokeText('✓ OK!', (1 - wrist.x) * width - 20, wrist.y * height + 30);
-          ctx.fillText('✓ OK!', (1 - wrist.x) * width - 20, wrist.y * height + 30);
-        }
-      });
-    }
-
-    // Draw info overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(10, 10, 250, 50);
-    ctx.fillStyle = 'white';
-    ctx.font = '14px monospace';
-    ctx.fillText(`Instrument: ${data.current_instrument || 'none'}`, 20, 30);
-    if (data.face && data.face.opera_enabled) {
-      ctx.fillText('🎵 OPERA MODE ACTIVE', 20, 50);
-    }
-    if (data.face && !data.face.neutral_done) {
-      ctx.fillText('⚠️ Calibrating...', 20, 70);
-    }
-    
-    // Restore context to undo flip
-    ctx.restore();
-  };
+  const pointerTrailRef = useRef([]);
 
   useEffect(() => {
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "user", width: 560, height: 370 }
+            video: { facingMode: "user", width: 570, height: 460 }
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -124,7 +45,6 @@ export default function CameraFeed({ onMotionData }) {
 
     const renderLoop = () => {
       if (!isActive) return;
-
       if (video.readyState >= video.HAVE_CURRENT_DATA) {
         // Set canvas size on first frame
         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
@@ -211,6 +131,157 @@ export default function CameraFeed({ onMotionData }) {
     return () => clearInterval(interval);
   }, [onMotionData, isProcessing]);
 
+  const drawOverlay = (ctx, data, width, height) => {
+    // Save context and flip horizontally to match mirrored display
+    ctx.save();
+    ctx.scale(-1, 1); // Flip horizontally
+    ctx.translate(-width, 0); // Move back into view
+
+    let pointerThisFrame = null;
+    
+    // Draw hand landmarks
+    if (data.hands && data.hands.length > 0) {
+      data.hands.forEach(hand => {
+        ctx.fillStyle = hand.label === 'Left' ? '#ed78d2ff' : '#61df9cff';
+        ctx.strokeStyle = hand.label === 'Left' ? '#ed78d2ff' : '#61df9cff';
+        ctx.lineWidth = 2;
+
+        // Draw points
+        hand.landmarks.forEach(lm => {
+          // Flip x to match mirrored canvas display
+          const x = (1 - lm.x) * width;
+          const y = lm.y * height;
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+
+        // Draw hand connections
+        const connections = [
+          [0, 1], [1, 2], [2, 3], [3, 4], // Thumb
+          [0, 5], [5, 6], [6, 7], [7, 8], // Index
+          [0, 9], [9, 10], [10, 11], [11, 12], // Middle
+          [0, 13], [13, 14], [14, 15], [15, 16], // Ring
+          [0, 17], [17, 18], [18, 19], [19, 20], // Pinky
+          [5, 9], [9, 13], [13, 17], // Palm
+        ];
+
+        connections.forEach(([i, j]) => {
+          const p1 = hand.landmarks[i];
+          const p2 = hand.landmarks[j];
+          ctx.beginPath();
+          // Flip x to match mirrored canvas display
+          ctx.moveTo((1 - p1.x) * width, p1.y * height);
+          ctx.lineTo((1 - p2.x) * width, p2.y * height);
+          ctx.stroke();
+        });
+
+        // Draw label
+        const wrist = hand.landmarks[0];
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 16px Arial';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 3;
+        const label = `(${hand.finger_count} fingers)`;
+        // Flip x to match mirrored canvas display
+        ctx.strokeText(label, (1 - wrist.x) * width - 30, wrist.y * height - 10);
+        ctx.fillText(label, (1 - wrist.x) * width - 30, wrist.y * height - 10);
+
+        // Show gestures
+        if (hand.gestures.ok_sign) {
+          ctx.strokeText('✓ OK!', (1 - wrist.x) * width - 20, wrist.y * height + 30);
+          ctx.fillText('✓ OK!', (1 - wrist.x) * width - 20, wrist.y * height + 30);
+        }
+        // Capture index fingertip as pointer when exactly 1 finger is up
+        if (hand.finger_count === 1 && hand.landmarks[8]) {
+          const tip = hand.landmarks[8];
+          const px = (1 - tip.x) * width;
+          const py = tip.y * height;
+          pointerThisFrame = { x: px, y: py };
+        }
+        
+      });
+    }
+
+    // Update trail history
+    const trail = pointerTrailRef.current;
+
+    if (pointerThisFrame) {
+      trail.push(pointerThisFrame);
+      // Limit length so it doesn't grow forever
+      if (trail.length > 25) {
+        trail.shift();
+      }
+    } else {
+      // No pointer this frame → let the trail slowly fade by trimming it
+      if (trail.length > 0) {
+        trail.shift();
+      }
+    }
+
+    // Draw the trail (fading)
+    if (trail.length > 1) {
+      for (let i = 1; i < trail.length; i++) {
+        const p0 = trail[i - 1];
+        const p1 = trail[i];
+        const t = i / trail.length; // 0 → old, 1 → newest
+
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.strokeStyle = `rgba(255, 252, 154, ${t})`;
+        ctx.lineWidth = 6;
+        ctx.stroke();
+      }
+
+      // bright dot at the head of the trail
+      const head = trail[trail.length - 1];
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, 8, 0, 2 * Math.PI);
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = 'rgba(255, 252, 154, 0.7)';
+      ctx.stroke();
+    }
+
+    // Draw info overlay
+    const volRaw =
+      typeof data.volume === "number" ? data.volume : 0; // 0–1 from backend
+    const volPercent = Math.round(volRaw * 100);
+
+    const playing =
+      data.playing === undefined ? true : !!data.playing;
+
+    // Check if any hand is currently doing the rock sign
+    const rockNow =
+      data.hands &&
+      data.hands.some(
+        (hand) => hand.gestures && hand.gestures.rock
+      );
+
+    // Background box
+    ctx.fillStyle = "rgba(218, 103, 168, 0.7)";
+    ctx.fillRect(10, 10, 175, 75);
+
+    // Text
+    ctx.fillStyle = "white";
+    ctx.font = "14px monospace";
+
+    ctx.fillText(
+      `Instrument: ${data.current_instrument ?? "none"}`,
+      20,
+      30
+    );
+    ctx.fillText(`Volume: ${volPercent}%`, 20, 50);
+    ctx.fillText(
+      `Shuffle: ${rockNow ? "🤘 YES" : "No :("}`,
+      20,
+      70
+    );
+
+
+    ctx.restore();
+  };
+
   return (
     <div className="camera-container" style={{ position: 'relative' }}>
       <video
@@ -230,10 +301,9 @@ export default function CameraFeed({ onMotionData }) {
           position: 'absolute',
           bottom: 10,
           right: 10,
-          background: 'rgba(0,0,0,0.7)',
+          background: 'rgba(218, 103, 168, 0.7)',
           color: 'white',
           padding: '5px 10px',
-          borderRadius: '5px',
           fontSize: '12px'
         }}>
           {motionData.hands?.length || 0} hand(s) detected

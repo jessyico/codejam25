@@ -1,12 +1,12 @@
 /* Pink connect button */
 .connect-sensor-btn {
-  background: rgb(250, 194, 211);
+  background: rgb(250, 194, 215);
   color: black;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 10px 24px;
-  font-size: 1rem;
-  font-family: "Inconsolata", monospace;
+  font-size: 1.4rem;
+  font-family: "Pixelify Sans", sans-serif;
   cursor: pointer;
   transition: background 0.2s;
 }
