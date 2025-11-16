@@ -59,7 +59,11 @@ function FitbitConnector({ onBpmChange }) {
     try {
       setStatus("Fetching...");
 
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const today = `${year}-${month}-${day}`; // YYYY-MM-DD in local time
       const url = `https://api.fitbit.com/1/user/-/activities/heart/date/${today}/1d/1min.json`;
 
       console.log("[Fitbit] Fetching:", url);
@@ -121,14 +125,14 @@ function FitbitConnector({ onBpmChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
-//   useEffect(() => {
-//     if (!accessToken) return;
-//     const interval = setInterval(() => {
-//       fetchHeartRate();
-//     }, 60000); // 10,000 ms = 10 seconds
+   useEffect(() => {
+    if (!accessToken) return;
+    const interval = setInterval(() => {
+       fetchHeartRate();
+     }, 60000); // 10,000 ms = 10 seconds
 
-//     return () => clearInterval(interval);
-//   }, [accessToken]);
+     return () => clearInterval(interval);
+   }, [accessToken]);
 
   return (
     <div style={{ marginBottom: "1rem" }}>
