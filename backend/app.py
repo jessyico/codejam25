@@ -61,10 +61,7 @@ def process_single_frame(frame):
     response = {
         'hands': [],
         'gestures': {},
-        # 'pitch': motion_engine.current_pitch,
-        # 'key_mode': motion_engine.key_mode,
-        # 'current_track': motion_engine.current_track,
-        'current_instrument': motion_engine.current_instrument,
+        'current_instrument': getattr(motion_engine, 'current_instrument', None),
         'prev_rock_any': motion_engine.prev_rock_any,
         'prev_two_fists': motion_engine.prev_two_fists,
     }
@@ -92,16 +89,11 @@ def process_single_frame(frame):
             is_rock = is_rock_sign(hand_landmarks)
             
             # Update pending selections based on hand
-            if hand_label == "Right" and finger_count > 0:
-                motion_engine.pending_track = finger_count
-            elif hand_label == "Left" and finger_count > 0:
+            if hand_label == "Left" and finger_count > 0:
                 motion_engine.pending_instrument = finger_count
             
-            # Confirm with OK gesture
-            if hand_label == "Left" and is_ok:
-                if motion_engine.pending_track is not None:
-                    motion_engine.current_track = motion_engine.pending_track
-            elif hand_label == "Right" and is_ok:
+            # Confirm with OK gesture (right hand confirms left hand instrument selection)
+            if hand_label == "Right" and is_ok:
                 if motion_engine.pending_instrument is not None:
                     motion_engine.current_instrument = motion_engine.pending_instrument
             
