@@ -103,7 +103,7 @@ function App() {
   <img src={logo} alt="HeartJam Logo" style={{ width: "500px" }} />
 </div>
 
-     {/*} <h1 className="pixelify-sans">Listen to your heart</h1>*/}
+     { <h1>Listen to your heart</h1>}
      <DndContext
   collisionDetection={closestCorners}
   onDragEnd={handleDragEnd}
@@ -111,7 +111,7 @@ function App() {
   <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
     {/* LEFT: Camera */}
     <div style={{ flex: 1 }}>
-    { /*  <CameraFeed /> */}
+    { <CameraFeed />}
     
       <p>Current BPM: {bpm}</p>
       <Heart bpm={bpm} />

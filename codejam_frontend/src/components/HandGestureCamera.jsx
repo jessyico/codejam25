@@ -198,7 +198,9 @@ export default function CameraFeed({ onMotionData }) {
     ctx.fillRect(10, 10, 250, 50);
     ctx.fillStyle = 'white';
     ctx.font = '14px monospace';
-    ctx.fillText(`Instrument: ${data.current_instrument || 'none'}`, 20, 30);
+    // ctx.fillText(`Pitch: ${(data.pitch || 0).toFixed(2)}`, 20, 50);
+    //ctx.fillText(`Track: ${data.current_track || 'none'}`, 50, 50);
+    ctx.fillText(`Instrument: ${data.current_instrument || 'none'}`, 20, 90);
     if (data.face && data.face.opera_enabled) {
       ctx.fillText('🎵 OPERA MODE ACTIVE', 20, 110);
     }

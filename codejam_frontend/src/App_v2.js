@@ -1,29 +1,25 @@
 import { useState, useEffect } from 'react';
 import './App.css';
-import CameraFeed from './components/CameraFeed';
 import Heart from "./components/Heart";
-import catpianoGif from "./assets/cat-playing-piano-funny.gif"; // import the GIF
-import catguitarGif from "./assets/cat-guitar.gif"; // import the GIF
-import drumGif from "./assets/drums.gif"; // import the GIF
-import bassGif from "./assets/bass-kitty.gif"; // import the GIF
-import saxoGif from "./assets/saxo.gif"; // import the GIF
-import Instrument from './components/Instrument';
 import AudioVisualizer from './components/AudioVisual';
 import FitbitConnector from "./components/FitbitConnect";
+import CameraFeed from './components/HandGestureCamera';
 
 function App_v2() {
   const [bpm, setBpm] = useState(80); // default BPM
+  const [motionData, setMotionData] = useState(null);
+  const [currentTrack, setCurrentTrack] = useState(null);
+  const [currentInstrument, setCurrentInstrument] = useState(null);
 
-  // Simulate incoming sensor data
-  useEffect(() => {
-    // Example: every 2 seconds, update BPM randomly
-    const interval = setInterval(() => {
-      const newBpm = 60 + Math.floor(Math.random() * 40); // 60-100 BPM
-      setBpm(newBpm);
-    }, 2000);
+  // Handle motion data from camera
+  const handleMotionData = (data) => {
+    setMotionData(data);
+    
+    // Update app state from motion tracking
+    if (data.current_track !== null) setCurrentTrack(data.current_track);
+    if (data.current_instrument !== null) setCurrentInstrument(data.current_instrument);
+  };
 
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <div>
@@ -33,38 +29,25 @@ function App_v2() {
 
       <FitbitConnector onBpmChange={setBpm} />
 
-<div className="instruments-container">
-<Instrument
-imgSrc={catpianoGif}
-alt="Funny cat piano"
-onClick={()=> alert("Meow! You played the cat piano!")}
-/>
-<Instrument
-imgSrc={saxoGif}
-alt="Saxophone"
-onClick={()=> alert("Mr. Saxobeat")}
-/>
-<Instrument
-imgSrc={catguitarGif}
-alt="Funny cat guitar"
-onClick={()=> alert("Meow! You played the cat guitar!")}
-/>
-<Instrument
-imgSrc={drumGif}
-alt="Fire drums"
-showFire={true}
-/>
-<Instrument
-imgSrc={bassGif}
-alt="Bass"
-onClick={()=> alert("You're all about that bass! (no treble here)")}
-/>
-</div>
-
-
 <p>Current BPM: {bpm}</p>
-      <CameraFeed />
-      <Heart bpm={80} /> {/* instead of 80 would change to be currentbpm based on the sensor data  */} 
+      {/* Motion-tracked camera with gesture controls */}
+      <CameraFeed onMotionData={handleMotionData} />
+      
+      {/* Display motion control state */}
+      <div style={{ 
+        background: 'rgba(0,0,0,0.8)', 
+        color: 'white', 
+        padding: '15px', 
+        margin: '10px 0',
+        borderRadius: '8px',
+        fontFamily: 'monospace'
+      }}>
+        <h3>🎮 Motion Controls</h3>
+        <p>Track: <strong>{currentTrack || 'None'}</strong> (right hand fingers + left OK)</p>
+        <p>Instrument: <strong>{currentInstrument || 'None'}</strong> (left hand fingers + right OK)</p>
+      </div>
+      
+      <Heart bpm={bpm} /> {/* instead of 80 would change to be currentbpm based on the sensor data  */} 
 <h1>My Music Visual</h1>
     <AudioVisualizer />
   </div>
